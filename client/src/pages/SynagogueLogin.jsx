@@ -1,0 +1,82 @@
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'sonner';
+import api from '../api/client';
+
+export default function SynagogueLogin() {
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { data } = await api.post('/auth/synagogue/login', form);
+      localStorage.setItem('dp_token', data.token);
+      localStorage.setItem('dp_role', 'synagogue');
+      localStorage.setItem('dp_synagogueId', data.synagogueId);
+      localStorage.setItem('dp_synagogueName', data.synagogueName);
+      toast.success(`Welcome, ${data.synagogueName}`);
+      navigate('/dashboard');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-ink-900 flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-10">
+          <Link to="/" className="font-display text-3xl text-gold-400 tracking-wide">Donation Plus</Link>
+          <p className="text-white/40 mt-2 text-sm">Gabai Portal</p>
+        </div>
+
+        <div className="card-dark p-8">
+          <h2 className="font-display text-2xl text-white mb-8 text-center">Sign In</h2>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="text-sm text-white/60 mb-1.5 block">Email</label>
+              <input
+                type="email"
+                required
+                className="w-full input-dark"
+                placeholder="gabai@synagogue.com"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm text-white/60 mb-1.5 block">Password</label>
+              <input
+                type="password"
+                required
+                className="w-full input-dark"
+                placeholder="••••••••"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+              />
+            </div>
+            <button type="submit" disabled={loading} className="btn-gold w-full mt-2">
+              {loading ? 'Signing in…' : 'Sign In'}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <button className="text-sm text-white/30 hover:text-gold-400 transition-colors">
+              Forgot password?
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 text-center">
+          <Link to="/" className="text-sm text-white/30 hover:text-white/60 transition-colors">
+            ← Back to Home
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}

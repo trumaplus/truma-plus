@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-ink-900 text-white;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+}
+
+@layer components {
+  .btn-gold {
+    @apply bg-gold-400 text-ink-900 font-semibold px-6 py-3 rounded-xl
+           hover:bg-gold-500 transition-all duration-200
+           shadow-luxury-sm hover:shadow-luxury hover:scale-[1.02]
+           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-outline {
+    @apply border border-gold-400/50 text-gold-400 font-semibold px-6 py-3 rounded-xl
+           hover:bg-gold-400/10 transition-all duration-200;
+  }
+
+  .card-dark {
+    @apply bg-ink-800 border border-white/5 rounded-2xl shadow-luxury;
+  }
+
+  .card-glass {
+    @apply bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl;
+  }
+
+  .input-dark {
+    @apply bg-ink-700 border border-white/10 rounded-xl px-4 py-2.5
+           text-white placeholder:text-white/40
+           focus:outline-none focus:border-gold-400/60 focus:ring-1 focus:ring-gold-400/30
+           transition-all duration-200;
+  }
+
+  .fade-in {
+    animation: fadeIn 0.4s ease-out;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,209,102,0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,209,102,0.5); }
