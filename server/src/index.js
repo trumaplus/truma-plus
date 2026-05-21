@@ -36,6 +36,10 @@ app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Local uploads (dev fallback when Cloudinary not configured)
+// media.js saves to server/uploads/, so we serve from there
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/synagogues', synagogueRoutes);
