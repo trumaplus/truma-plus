@@ -25,10 +25,7 @@ export default function Home() {
       {/* Header */}
       <header className="border-b border-white/5 bg-ink-800/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="font-display text-2xl text-gold-400 tracking-wide">Donation Plus</h1>
-            <p className="text-xs text-white/40 mt-0.5">Sacred giving made simple</p>
-          </div>
+          <img src="/logo.png" alt="Truma Plus" className="h-10 object-contain" />
           <button
             onClick={() => navigate('/login')}
             className="text-sm text-white/50 hover:text-gold-400 transition-colors"
@@ -42,6 +39,7 @@ export default function Home() {
       <section className="relative py-20 px-6 text-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-ink-600/20 to-transparent pointer-events-none" />
         <div className="relative max-w-2xl mx-auto">
+          <img src="/logo.png" alt="Truma Plus" className="h-28 mx-auto mb-8 object-contain drop-shadow-[0_0_40px_rgba(212,175,55,0.3)]" />
           <p className="text-gold-400 text-sm font-medium tracking-widest uppercase mb-4">Choose Your Synagogue</p>
           <h2 className="font-display text-5xl text-white mb-6 leading-tight">
             Give with Meaning,<br />

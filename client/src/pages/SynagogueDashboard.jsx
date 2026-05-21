@@ -49,8 +49,8 @@ export default function SynagogueDashboard() {
       {/* Sidebar */}
       <aside className="w-64 bg-ink-800 border-r border-white/5 flex flex-col fixed inset-y-0 left-0 z-30">
         <div className="p-6 border-b border-white/5">
-          <p className="font-display text-gold-400 text-lg">Donation Plus</p>
-          <p className="text-white/40 text-xs mt-0.5">Gabai Dashboard</p>
+          <img src="/logo.png" alt="Truma Plus" className="h-8 object-contain mb-1.5" />
+          <p className="text-white/40 text-xs">Gabai Dashboard</p>
         </div>
         <div className="p-4 border-b border-white/5">
           {synagogue?.logoUrl && (

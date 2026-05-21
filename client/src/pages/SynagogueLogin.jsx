@@ -30,8 +30,10 @@ export default function SynagogueLogin() {
     <div className="min-h-screen bg-ink-900 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
-          <Link to="/" className="font-display text-3xl text-gold-400 tracking-wide">Donation Plus</Link>
-          <p className="text-white/40 mt-2 text-sm">Gabai Portal</p>
+          <Link to="/" className="inline-block">
+            <img src="/logo.png" alt="Truma Plus" className="h-20 mx-auto object-contain" />
+          </Link>
+          <p className="text-white/40 mt-3 text-sm">Gabai Portal</p>
         </div>
 
         <div className="card-dark p-8">

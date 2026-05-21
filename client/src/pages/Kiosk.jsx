@@ -152,6 +152,11 @@ export default function Kiosk() {
       <header className={`${headerBg} border-b backdrop-blur-sm sticky top-0 z-40`}>
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            {/* App logo */}
+            <img src="/logo.png" alt="Truma Plus" className="h-9 object-contain shrink-0" />
+            {/* Divider */}
+            <span className={`w-px h-7 ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
+            {/* Synagogue logo + name */}
             {synagogue.logoUrl && (
               <img src={synagogue.logoUrl} alt="Logo" className="h-10 w-10 rounded-xl object-cover" />
             )}
