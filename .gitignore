@@ -5,6 +5,10 @@ node_modules/
 # Build output
 client/dist/
 client/build/
+client/dev-dist/
+
+# User-uploaded media (local dev fallback; use Cloudinary in production)
+server/uploads/
 
 # Environment files — NEVER commit these
 .env
