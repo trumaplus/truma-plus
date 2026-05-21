@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+client/dist/
+client/build/
+
+# Environment files — NEVER commit these
+.env
+.env.local
+.env.production
+server/.env
+
+# Database (local SQLite dev)
+server/prisma/*.db
+server/prisma/*.db-journal
+server/prisma/dev.db*
+
+# Logs
+*.log
+server/server.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# PWA icon generation script (dev tool only)
+client/generate-icons.mjs
+client/public/sw-custom.js
+
+# Prisma generated engine (regenerated on install)
+server/node_modules/.prisma/
+
+# Coverage
+coverage/

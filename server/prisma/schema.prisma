@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Production: Railway PostgreSQL  (DATABASE_URL=postgresql://...)
+// Local dev:  SQLite               (DATABASE_URL=file:./dev.db) — change provider to "sqlite"
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model Synagogue {
+  id                   String      @id @default(cuid())
+  synagogueName        String
+  synagogueCode        String      @unique
+  email                String      @unique
+  passwordHash         String
+  city                 String?
+  latitude             Float       @default(45.5017)
+  longitude            Float       @default(-73.5673)
+  candleLightingOffset Int         @default(18)
+  logoUrl              String?
+  theme                String      @default("dark")
+  shabbatModeActive    Boolean     @default(false)
+  slideshowInterval    Int         @default(10)
+  kioskPin             String?
+  prayerTimes          String?
+  emergencyNumbers     String?
+  announcements        String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  donations            Donation[]
+  mediaItems           MediaItem[]
+}
+
+model Donation {
+  id               String    @id @default(cuid())
+  synagogueId      String
+  synagogue        Synagogue @relation(fields: [synagogueId], references: [id], onDelete: Cascade)
+  amount           Float
+  currency         String    @default("CAD")
+  donationType     String    @default("general")
+  donorFirstName   String?
+  donorLastName    String?
+  donorEmail       String?
+  donorPhone       String?
+  donorAddress     String?
+  receiptRequested Boolean   @default(false)
+  receiptSent      Boolean   @default(false)
+  smsSent          Boolean   @default(false)
+  paymentMethod    String    @default("online")
+  paymentStatus    String    @default("pending")
+  stripeSessionId  String?   @unique
+  transactionId    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([synagogueId])
+  @@index([paymentStatus])
+}
+
+model MediaItem {
+  id          String    @id @default(cuid())
+  synagogueId String
+  synagogue   Synagogue @relation(fields: [synagogueId], references: [id], onDelete: Cascade)
+  url         String
+  type        String
+  filename    String
+  order       Int       @default(0)
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  @@index([synagogueId])
+}
