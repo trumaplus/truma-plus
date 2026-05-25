@@ -8,7 +8,12 @@ const prisma = new PrismaClient();
 // GET /api/donations
 router.get('/', requireAdminOrSynagogue, async (req, res) => {
   try {
-    const where = req.user.role === 'synagogue' ? { synagogueId: req.user.synagogueId } : {};
+    const where =
+      req.user.role === 'synagogue'
+        ? { synagogueId: req.user.synagogueId }
+        : req.query.synagogueId
+          ? { synagogueId: req.query.synagogueId }
+          : {};
     const { limit = 100, offset = 0, status } = req.query;
     if (status) where.paymentStatus = status;
 

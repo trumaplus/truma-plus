@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import api from '../api/client';
 
@@ -7,6 +7,12 @@ export default function SynagogueLogin() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  const existingToken = localStorage.getItem('dp_token');
+  const existingRole  = localStorage.getItem('dp_role');
+  if (existingToken && existingRole === 'synagogue') return <Navigate to="/dashboard" replace />;
+  if (existingToken && existingRole === 'admin')     return <Navigate to="/admin" replace />;
 
   async function handleSubmit(e) {
     e.preventDefault();

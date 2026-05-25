@@ -8,10 +8,10 @@ import DonationsTable from '../components/admin/DonationsTable';
 import KioskControl from '../components/admin/KioskControl';
 
 const TABS = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'synagogues', label: 'Synagogues', icon: Building2 },
-  { id: 'donations', label: 'All Donations', icon: DollarSign },
-  { id: 'kiosks', label: 'Live Kiosks', icon: Tablet },
+  { id: 'overview',    label: 'Overview',       icon: LayoutDashboard },
+  { id: 'synagogues',  label: 'Synagogues',     icon: Building2 },
+  { id: 'donations',   label: 'All Donations',  icon: DollarSign },
+  { id: 'kiosks',      label: 'Live Kiosks',    icon: Tablet },
 ];
 
 export default function AdminDashboard() {
@@ -33,8 +33,11 @@ export default function AdminDashboard() {
     navigate('/admin/login');
   }
 
-  const completed = donations.filter((d) => d.paymentStatus === 'completed');
+  const completed   = donations.filter((d) => d.paymentStatus === 'completed');
   const totalRaised = completed.reduce((sum, d) => sum + d.amount, 0);
+  const thisMonth   = completed
+    .filter((d) => new Date(d.createdAt).getMonth() === new Date().getMonth())
+    .reduce((sum, d) => sum + d.amount, 0);
 
   return (
     <div className="min-h-screen bg-ink-900 flex font-body">
@@ -65,7 +68,8 @@ export default function AdminDashboard() {
         <div className="p-4 border-t border-white/5">
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-white/30 hover:text-red-400 hover:bg-red-900/20 transition-all"
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm
+                       text-white/30 hover:text-red-400 hover:bg-red-900/20 transition-all"
           >
             <LogOut className="w-4 h-4" />
             Sign Out
@@ -75,16 +79,26 @@ export default function AdminDashboard() {
 
       {/* Content */}
       <main className="flex-1 ml-64 p-8">
+
+        {/* ── Overview ── */}
         {tab === 'overview' && (
           <div className="fade-in">
             <h2 className="font-display text-3xl text-white mb-8">System Overview</h2>
+
             <div className="grid grid-cols-3 gap-6 mb-8">
-              <StatCard label="Total Synagogues" value={synagogues.length} sub="registered" color="blue" />
-              <StatCard label="Total Raised" value={`$${totalRaised.toLocaleString('en-CA', { minimumFractionDigits: 2 })}`} sub="CAD all time" />
-              <StatCard label="Completed Donations" value={completed.length} sub="transactions" />
+              <StatCard label="Total Synagogues"    value={synagogues.length}  sub="registered" />
+              <StatCard
+                label="Total Raised"
+                value={`$${totalRaised.toLocaleString('en-CA', { minimumFractionDigits: 2 })}`}
+                sub="CAD all time"
+              />
+              <StatCard
+                label="This Month"
+                value={`$${thisMonth.toLocaleString('en-CA', { minimumFractionDigits: 2 })}`}
+                sub={`${completed.filter((d) => new Date(d.createdAt).getMonth() === new Date().getMonth()).length} donations`}
+              />
             </div>
 
-            {/* Recent activity */}
             <div className="card-dark p-6">
               <h3 className="font-display text-xl text-white mb-4">Recent Donations</h3>
               <DonationsTable />
@@ -92,15 +106,19 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* ── Synagogues ── */}
         {tab === 'synagogues' && (
           <div className="fade-in">
             <h2 className="font-display text-3xl text-white mb-8">Synagogues</h2>
             <div className="card-dark p-6">
-              <SynagoguesList />
+              <SynagoguesList
+                onEnterDashboard={(id) => navigate(`/admin/synagogue/${id}`)}
+              />
             </div>
           </div>
         )}
 
+        {/* ── All Donations ── */}
         {tab === 'donations' && (
           <div className="fade-in">
             <h2 className="font-display text-3xl text-white mb-8">All Donations</h2>
@@ -110,6 +128,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* ── Live Kiosks ── */}
         {tab === 'kiosks' && (
           <div className="fade-in">
             <h2 className="font-display text-3xl text-white mb-8">Live Kiosks</h2>
