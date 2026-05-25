@@ -81,6 +81,38 @@ router.post('/synagogue/reset-password', async (req, res) => {
   res.json({ ok: true });
 });
 
+// POST /api/auth/login  — unified: works for both admin and gabai
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+
+    // 1. Check admin table first
+    const admin = await prisma.admin.findUnique({ where: { email } });
+    if (admin) {
+      const valid = await bcrypt.compare(password, admin.passwordHash);
+      if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+      const token = signToken({ role: 'admin', adminId: admin.id });
+      return res.json({ token, role: 'admin', email: admin.email });
+    }
+
+    // 2. Fallback: check synagogue table
+    const synagogue = await prisma.synagogue.findUnique({ where: { email } });
+    if (!synagogue) return res.status(401).json({ error: 'Invalid credentials' });
+    const valid = await bcrypt.compare(password, synagogue.passwordHash);
+    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+    const token = signToken({ role: 'synagogue', synagogueId: synagogue.id });
+    return res.json({
+      token,
+      role: 'synagogue',
+      synagogueId: synagogue.id,
+      synagogueName: synagogue.synagogueName,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/auth/me
 router.get('/me', authenticate, async (req, res) => {
   res.json({ role: req.user.role, id: req.user.adminId || req.user.synagogueId });

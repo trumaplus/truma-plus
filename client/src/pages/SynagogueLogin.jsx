@@ -3,28 +3,36 @@ import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import api from '../api/client';
 
-export default function SynagogueLogin() {
-  const [form, setForm] = useState({ email: '', password: '' });
+export default function Login() {
+  const [form, setForm]       = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Redirect if already logged in
+  // Already logged in → go straight to the right dashboard
   const existingToken = localStorage.getItem('dp_token');
   const existingRole  = localStorage.getItem('dp_role');
   if (existingToken && existingRole === 'synagogue') return <Navigate to="/dashboard" replace />;
-  if (existingToken && existingRole === 'admin')     return <Navigate to="/admin" replace />;
+  if (existingToken && existingRole === 'admin')     return <Navigate to="/admin"     replace />;
 
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/synagogue/login', form);
+      // Single unified endpoint — server decides admin vs. gabai
+      const { data } = await api.post('/auth/login', form);
+
       localStorage.setItem('dp_token', data.token);
-      localStorage.setItem('dp_role', 'synagogue');
-      localStorage.setItem('dp_synagogueId', data.synagogueId);
-      localStorage.setItem('dp_synagogueName', data.synagogueName);
-      toast.success(`Welcome, ${data.synagogueName}`);
-      navigate('/dashboard');
+      localStorage.setItem('dp_role',  data.role);
+
+      if (data.role === 'admin') {
+        toast.success('Welcome, Admin');
+        navigate('/admin');
+      } else {
+        localStorage.setItem('dp_synagogueId',   data.synagogueId);
+        localStorage.setItem('dp_synagogueName', data.synagogueName);
+        toast.success(`Welcome, ${data.synagogueName}`);
+        navigate('/dashboard');
+      }
     } catch (err) {
       toast.error(err.response?.data?.error || 'Login failed');
     } finally {
@@ -35,13 +43,16 @@ export default function SynagogueLogin() {
   return (
     <div className="min-h-screen bg-ink-900 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
+
+        {/* Logo */}
         <div className="text-center mb-10">
           <Link to="/" className="inline-block">
             <img src="/logo.png" alt="Truma Plus" className="h-20 mx-auto object-contain" />
           </Link>
-          <p className="text-white/40 mt-3 text-sm">Gabai Portal</p>
+          <p className="text-white/40 mt-3 text-sm">כניסה לפאנל ניהול</p>
         </div>
 
+        {/* Card */}
         <div className="card-dark p-8">
           <h2 className="font-display text-2xl text-white mb-8 text-center">Sign In</h2>
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -50,8 +61,9 @@ export default function SynagogueLogin() {
               <input
                 type="email"
                 required
+                autoComplete="email"
                 className="w-full input-dark"
-                placeholder="gabai@synagogue.com"
+                placeholder="your@email.com"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
@@ -61,6 +73,7 @@ export default function SynagogueLogin() {
               <input
                 type="password"
                 required
+                autoComplete="current-password"
                 className="w-full input-dark"
                 placeholder="••••••••"
                 value={form.password}
@@ -71,12 +84,6 @@ export default function SynagogueLogin() {
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
-
-          <div className="mt-6 text-center">
-            <button className="text-sm text-white/30 hover:text-gold-400 transition-colors">
-              Forgot password?
-            </button>
-          </div>
         </div>
 
         <div className="mt-6 text-center">
