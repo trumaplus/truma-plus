@@ -191,14 +191,17 @@ export default function Kiosk() {
             {/* Kiosk Mode button */}
             <KioskModeButton kioskPin={synagogue.kioskPin} isDark={isDark} />
 
-            {/* Hidden gabai settings button */}
+            {/* Gabai login button — subtle but visible */}
             <button
               onClick={() => navigate('/login')}
-              className={`p-2 rounded-xl transition-colors
-                ${isDark ? 'text-white/10 hover:text-white/30' : 'text-gray-200 hover:text-gray-400'}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all
+                ${isDark
+                  ? 'text-white/30 hover:text-gold-400 hover:bg-white/8 border border-white/10 hover:border-gold-400/30'
+                  : 'text-gray-400 hover:text-ink-900 hover:bg-gray-100 border border-gray-200'}`}
               title="Gabai Login"
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-3.5 h-3.5" />
+              <span>Gabai</span>
             </button>
           </div>
         </div>
