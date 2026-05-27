@@ -11,13 +11,7 @@ import DonationPanel from '../components/DonationPanel';
 import ShabbatMode from '../components/ShabbatMode';
 import KioskModeButton from '../components/KioskModeButton';
 import { useShabbatTimes } from '../components/useShabbatTimes';
-
-const LANGS = [
-  { code: 'en', label: 'EN' },
-  { code: 'he', label: 'עב' },
-  { code: 'fr', label: 'FR' },
-  { code: 'yi', label: 'יי' },
-];
+import { useLanguage, LANGS } from '../context/LanguageContext';
 
 // In production: same origin as client (Express serves both)
 // In dev: Vite proxy forwards /socket.io to localhost:3001
@@ -27,7 +21,7 @@ export default function Kiosk() {
   const { synagogueId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [lang, setLang] = useState('en');
+  const { lang, setLang } = useLanguage();   // global language context
   const [shabbatOverride, setShabbatOverride] = useState(null);
   const [announcement, setAnnouncement] = useState(null);
   const socketRef = useRef(null);

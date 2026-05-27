@@ -7,6 +7,8 @@ import SynagogueDashboard from './pages/SynagogueDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminSynagogueView from './pages/AdminSynagogueView';
 import PWAUpdateBanner from './components/PWAUpdateBanner';
+import LanguageSwitcher from './components/LanguageSwitcher';
+import { LanguageProvider } from './context/LanguageContext';
 
 /**
  * Protects a route by role.
@@ -31,52 +33,55 @@ function ProtectedRoute({ children, requiredRole }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Toaster position="top-right" richColors theme="dark" />
-      <PWAUpdateBanner />
-      <Routes>
-        {/* Public */}
-        <Route path="/"                      element={<Home />} />
-        <Route path="/kiosk/:synagogueId"    element={<Kiosk />} />
+    <LanguageProvider>
+      <BrowserRouter>
+        <Toaster position="top-right" richColors theme="dark" />
+        <PWAUpdateBanner />
+        <LanguageSwitcher />
+        <Routes>
+          {/* Public */}
+          <Route path="/"                   element={<Home />} />
+          <Route path="/kiosk/:synagogueId" element={<Kiosk />} />
 
-        {/* Single unified login — works for admin + gabai */}
-        <Route path="/login"       element={<Login />} />
-        {/* Legacy admin/login URL → same page */}
-        <Route path="/admin/login" element={<Navigate to="/login" replace />} />
+          {/* Single unified login — works for admin + gabai */}
+          <Route path="/login"       element={<Login />} />
+          {/* Legacy admin/login URL → same page */}
+          <Route path="/admin/login" element={<Navigate to="/login" replace />} />
 
-        {/* Gabai dashboard */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute requiredRole="synagogue">
-              <SynagogueDashboard />
-            </ProtectedRoute>
-          }
-        />
+          {/* Gabai dashboard */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute requiredRole="synagogue">
+                <SynagogueDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Admin dashboard */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
+          {/* Admin dashboard */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Admin: view a specific synagogue's dashboard */}
-        <Route
-          path="/admin/synagogue/:synagogueId"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <AdminSynagogueView />
-            </ProtectedRoute>
-          }
-        />
+          {/* Admin: view a specific synagogue's dashboard */}
+          <Route
+            path="/admin/synagogue/:synagogueId"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminSynagogueView />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </LanguageProvider>
   );
 }
