@@ -68,6 +68,14 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Donation Plus server running on port ${PORT} [${isProduction ? 'production' : 'development'}]`);
+});
+
+// Keep server alive — log errors but don't crash
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err.message, err.stack);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
 });
