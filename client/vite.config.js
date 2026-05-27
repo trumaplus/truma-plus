@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.png', 'icons/icon.svg'],
       manifest: {
-        name: 'Donation Plus',
-        short_name: 'Donation+',
+        name: 'Truma Plus',
+        short_name: 'Truma+',
         description: 'Sacred giving made simple — Synagogue donation kiosk',
         theme_color: '#07131a',
         background_color: '#07131a',
