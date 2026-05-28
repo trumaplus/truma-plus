@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Save, Upload, Lock, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Save, Upload, Lock, KeyRound, Eye, EyeOff, Phone } from 'lucide-react';
 import api from '../../api/client';
 import StripeConnectCard from './StripeConnectCard';
 
@@ -90,6 +90,13 @@ function ChangePasswordSection({ synagogueId }) {
 
 export default function SynagogueSettingsForm({ synagogue }) {
   const qc = useQueryClient();
+  const existingEmergency = (() => {
+    try { return typeof synagogue.emergencyNumbers === 'string'
+      ? JSON.parse(synagogue.emergencyNumbers)
+      : (synagogue.emergencyNumbers || {}); }
+    catch { return {}; }
+  })();
+
   const [form, setForm] = useState({
     synagogueName: synagogue.synagogueName || '',
     city: synagogue.city || '',
@@ -100,11 +107,15 @@ export default function SynagogueSettingsForm({ synagogue }) {
     theme: synagogue.theme || 'dark',
     slideshowInterval: synagogue.slideshowInterval || 10,
     kioskPin: synagogue.kioskPin || '',
+    hatzalahNumber: existingEmergency.hatzalah || '',
   });
   const [logoUploading, setLogoUploading] = useState(false);
 
   const saveMut = useMutation({
-    mutationFn: (data) => api.put(`/synagogues/${synagogue.id}`, data),
+    mutationFn: ({ hatzalahNumber, ...rest }) => {
+      const emergencyNumbers = JSON.stringify({ hatzalah: hatzalahNumber || null });
+      return api.put(`/synagogues/${synagogue.id}`, { ...rest, emergencyNumbers });
+    },
     onSuccess: () => {
       toast.success('Settings saved');
       qc.invalidateQueries(['synagogue', synagogue.id]);
@@ -239,6 +250,24 @@ export default function SynagogueSettingsForm({ synagogue }) {
           <p className="text-white/25 text-xs mt-1">
             Tablet users must enter this PIN to exit fullscreen kiosk mode.
             Leave empty to allow free exit.
+          </p>
+        </div>
+
+        {/* Hatzalah / Emergency number */}
+        <div className="col-span-2">
+          <label className="text-sm text-white/60 mb-1.5 flex items-center gap-2">
+            <Phone className="w-3.5 h-3.5 text-red-400/70" />
+            Hatzalah / Emergency Number (shown on Shabbat screen)
+          </label>
+          <input
+            type="tel"
+            placeholder="e.g. 514-738-3311 — leave empty to hide"
+            className="w-full input-dark font-mono"
+            value={form.hatzalahNumber}
+            onChange={(e) => setForm({ ...form, hatzalahNumber: e.target.value })}
+          />
+          <p className="text-white/25 text-xs mt-1">
+            Appears as a second emergency button next to 911 during Shabbat mode.
           </p>
         </div>
 

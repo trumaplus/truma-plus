@@ -16,7 +16,12 @@ export default function ShabbatMode({ synagogue, shabbatTimes }) {
 
   const hebrewDay = time.toLocaleDateString('he-IL', { weekday: 'long' });
 
-  const emergencyNumbers = synagogue?.emergencyNumbers || {};
+  const emergencyNumbers = (() => {
+    const raw = synagogue?.emergencyNumbers;
+    if (!raw) return {};
+    if (typeof raw === 'object') return raw;
+    try { return JSON.parse(raw); } catch { return {}; }
+  })();
   const prayerTimes = synagogue?.prayerTimes?.shabbat || {};
 
   return (
