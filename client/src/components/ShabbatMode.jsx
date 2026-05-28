@@ -11,7 +11,7 @@ export default function ShabbatMode({ synagogue, shabbatTimes }) {
 
   const formatTime = (iso) => {
     if (!iso) return '--:--';
-    return new Date(iso).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
   const hebrewDay = time.toLocaleDateString('he-IL', { weekday: 'long' });
@@ -44,7 +44,7 @@ export default function ShabbatMode({ synagogue, shabbatTimes }) {
         )}
 
         <div className="text-white/30 text-3xl font-mono mt-8 mb-8">
-          {time.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}
+          {time.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', hour12: false })}
         </div>
 
         {/* Candles / Havdalah */}

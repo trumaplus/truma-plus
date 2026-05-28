@@ -63,108 +63,111 @@ export default function DonationPanel({ synagogue, lang = 'en' }) {
   };
 
   return (
-    <div className="h-full flex flex-col gap-4 overflow-y-auto">
-      <div className="card-glass p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Heart className="w-5 h-5 text-gold-400" />
-          <h2 className="font-display text-xl text-gold-400">{t.title}</h2>
-        </div>
-
-        {/* Donation Type */}
-        <div className="mb-4">
-          <p className="text-white/50 text-xs mb-2 uppercase tracking-wide">{t.type}</p>
-          <div className="grid grid-cols-2 gap-2">
-            {DONATION_TYPES.map((dt) => (
-              <button
-                key={dt.id}
-                onClick={() => setDonationType(dt.id)}
-                className={`py-2 px-3 rounded-xl text-sm font-medium transition-all ${
-                  donationType === dt.id
-                    ? 'bg-gold-400 text-ink-900'
-                    : 'bg-white/5 text-white/60 hover:bg-white/10'
-                }`}
-              >
-                {dt[lang] || dt.en}
-              </button>
-            ))}
+    <div className="h-full flex flex-col gap-3 overflow-hidden">
+      {/* Form card — scrolls internally when donor details expand */}
+      <div className="card-glass flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Heart className="w-5 h-5 text-gold-400" />
+            <h2 className="font-display text-xl text-gold-400">{t.title}</h2>
           </div>
-        </div>
 
-        {/* Quick Amounts */}
-        <div className="mb-4">
-          <p className="text-white/50 text-xs mb-2 uppercase tracking-wide">{t.amount} (CAD)</p>
-          <div className="grid grid-cols-3 gap-2 mb-2">
-            {QUICK_AMOUNTS.map((a) => (
-              <button
-                key={a}
-                onClick={() => { setAmount(a); setCustomAmount(''); }}
-                className={`py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  amount === a && !customAmount
-                    ? 'bg-gold-400 text-ink-900 shadow-luxury-sm'
-                    : 'bg-white/5 text-white/70 hover:bg-white/10'
-                }`}
-              >
-                ${a}
-              </button>
-            ))}
-          </div>
-          <input
-            type="number"
-            min="1"
-            placeholder={`${t.custom} $`}
-            value={customAmount}
-            onChange={(e) => setCustomAmount(e.target.value)}
-            className="w-full input-dark text-center text-lg font-semibold"
-          />
-        </div>
-
-        {/* Donor Details Toggle */}
-        <button
-          onClick={() => setShowDetails(!showDetails)}
-          className="w-full flex items-center justify-between text-white/40 text-sm py-2 hover:text-white/60 transition-colors"
-        >
-          <span>{t.details}</span>
-          {showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
-
-        {showDetails && (
-          <div className="space-y-3 mt-3 fade-in">
+          {/* Donation Type */}
+          <div className="mb-4">
+            <p className="text-white/50 text-xs mb-2 uppercase tracking-wide">{t.type}</p>
             <div className="grid grid-cols-2 gap-2">
-              <input
-                type="text"
-                placeholder={t.firstName}
-                className="input-dark text-sm"
-                value={donor.firstName}
-                onChange={(e) => setDonor({ ...donor, firstName: e.target.value })}
-              />
-              <input
-                type="text"
-                placeholder={t.lastName}
-                className="input-dark text-sm"
-                value={donor.lastName}
-                onChange={(e) => setDonor({ ...donor, lastName: e.target.value })}
-              />
+              {DONATION_TYPES.map((dt) => (
+                <button
+                  key={dt.id}
+                  onClick={() => setDonationType(dt.id)}
+                  className={`py-2 px-3 rounded-xl text-sm font-medium transition-all ${
+                    donationType === dt.id
+                      ? 'bg-gold-400 text-ink-900'
+                      : 'bg-white/5 text-white/60 hover:bg-white/10'
+                  }`}
+                >
+                  {dt[lang] || dt.en}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Amounts */}
+          <div className="mb-4">
+            <p className="text-white/50 text-xs mb-2 uppercase tracking-wide">{t.amount} (CAD)</p>
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              {QUICK_AMOUNTS.map((a) => (
+                <button
+                  key={a}
+                  onClick={() => { setAmount(a); setCustomAmount(''); }}
+                  className={`py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                    amount === a && !customAmount
+                      ? 'bg-gold-400 text-ink-900 shadow-luxury-sm'
+                      : 'bg-white/5 text-white/70 hover:bg-white/10'
+                  }`}
+                >
+                  ${a}
+                </button>
+              ))}
             </div>
             <input
-              type="email"
-              placeholder={t.email}
-              className="w-full input-dark text-sm"
-              value={donor.email}
-              onChange={(e) => setDonor({ ...donor, email: e.target.value })}
-            />
-            <input
-              type="tel"
-              placeholder={t.phone}
-              className="w-full input-dark text-sm"
-              value={donor.phone}
-              onChange={(e) => setDonor({ ...donor, phone: e.target.value })}
+              type="number"
+              min="1"
+              placeholder={`${t.custom} $`}
+              value={customAmount}
+              onChange={(e) => setCustomAmount(e.target.value)}
+              className="w-full input-dark text-center text-lg font-semibold"
             />
           </div>
-        )}
+
+          {/* Donor Details Toggle */}
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="w-full flex items-center justify-between text-white/40 text-sm py-2 hover:text-white/60 transition-colors"
+          >
+            <span>{t.details}</span>
+            {showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          {showDetails && (
+            <div className="space-y-3 mt-3 fade-in">
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder={t.firstName}
+                  className="input-dark text-sm"
+                  value={donor.firstName}
+                  onChange={(e) => setDonor({ ...donor, firstName: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder={t.lastName}
+                  className="input-dark text-sm"
+                  value={donor.lastName}
+                  onChange={(e) => setDonor({ ...donor, lastName: e.target.value })}
+                />
+              </div>
+              <input
+                type="email"
+                placeholder={t.email}
+                className="w-full input-dark text-sm"
+                value={donor.email}
+                onChange={(e) => setDonor({ ...donor, email: e.target.value })}
+              />
+              <input
+                type="tel"
+                placeholder={t.phone}
+                className="w-full input-dark text-sm"
+                value={donor.phone}
+                onChange={(e) => setDonor({ ...donor, phone: e.target.value })}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Summary + Donate */}
-      <div className="card-glass p-5">
+      {/* Summary + Donate — always visible at bottom */}
+      <div className="card-glass p-5 shrink-0">
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-white/40 text-xs">Donation</p>

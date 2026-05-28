@@ -131,7 +131,7 @@ export default function Kiosk() {
   const headerBg = isDark ? 'bg-ink-800/90 border-white/5' : 'bg-white/90 border-gray-200';
 
   return (
-    <div className={`min-h-screen ${bg} font-body`}>
+    <div className={`h-screen overflow-hidden flex flex-col ${bg} font-body`}>
       {isShabbat && <ShabbatMode synagogue={synagogue} shabbatTimes={shabbatTimes} />}
 
       {/* Floating announcement */}
@@ -143,7 +143,7 @@ export default function Kiosk() {
       )}
 
       {/* Header */}
-      <header className={`${headerBg} border-b backdrop-blur-sm sticky top-0 z-40`}>
+      <header className={`shrink-0 ${headerBg} border-b backdrop-blur-sm z-40`}>
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* App logo */}
@@ -202,15 +202,15 @@ export default function Kiosk() {
       </header>
 
       {/* Main 3-column layout */}
-      <main className="max-w-7xl mx-auto px-4 py-4 h-[calc(100vh-64px)]">
+      <main className="flex-1 min-h-0 max-w-7xl mx-auto w-full px-4 py-3 overflow-hidden">
         <div className="grid grid-cols-12 gap-4 h-full">
           {/* Left — Announcements */}
-          <div className="col-span-3 overflow-auto">
+          <div className="col-span-3 h-full min-h-0 overflow-hidden">
             <AnnouncementBoard synagogue={synagogue} lang={lang} />
           </div>
 
           {/* Center — Media Slideshow */}
-          <div className="col-span-5">
+          <div className="col-span-5 h-full min-h-0">
             <MediaSlideshow
               mediaItems={mediaItems}
               interval={synagogue.slideshowInterval || 10}
@@ -219,7 +219,7 @@ export default function Kiosk() {
           </div>
 
           {/* Right — Donation Panel */}
-          <div className="col-span-4 overflow-auto">
+          <div className="col-span-4 h-full min-h-0 overflow-hidden">
             <DonationPanel synagogue={synagogue} lang={lang} />
           </div>
         </div>
