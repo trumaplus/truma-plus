@@ -3,7 +3,10 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const path = require('path');
+const { PrismaClient } = require('@prisma/client');
 const { initSocket } = require('./socket');
+
+const prisma = new PrismaClient();
 
 const authRoutes = require('./routes/auth');
 const synagogueRoutes = require('./routes/synagogues');
@@ -71,6 +74,21 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Donation Plus server running on port ${PORT} [${isProduction ? 'production' : 'development'}]`);
 });
+
+// ── Cleanup stale pending donations every hour ────────────────────────────────
+async function cleanupStalePending() {
+  try {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24h ago
+    const { count } = await prisma.donation.deleteMany({
+      where: { paymentStatus: 'pending', createdAt: { lt: cutoff } },
+    });
+    if (count > 0) console.log(`[Cleanup] Removed ${count} stale pending donation(s)`);
+  } catch (err) {
+    console.error('[Cleanup] Error:', err.message);
+  }
+}
+cleanupStalePending(); // run once on startup
+setInterval(cleanupStalePending, 60 * 60 * 1000); // then every hour
 
 // Keep server alive — log errors but don't crash
 process.on('uncaughtException', (err) => {

@@ -12,7 +12,7 @@ const STATUS_COLORS = {
 
 export default function DonationsTable({ synagogueId }) {
   const qc = useQueryClient();
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('completed');
 
   const { data: donations = [], isLoading } = useQuery({
     queryKey: ['donations', synagogueId, filter],
