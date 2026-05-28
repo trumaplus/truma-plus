@@ -15,6 +15,14 @@ const isConfigured = () =>
   process.env.STRIPE_SECRET_KEY &&
   process.env.STRIPE_SECRET_KEY !== 'sk_test_placeholder';
 
+function getClientUrl() {
+  return process.env.CLIENT_URL && !process.env.CLIENT_URL.includes('localhost')
+    ? process.env.CLIENT_URL
+    : 'https://truma-plus-production.up.railway.app';
+}
+
+// ── Checkout Session ─────────────────────────────────────────────────────────
+
 async function createCheckoutSession({ amount, donationType, donorInfo, synagogue }) {
   const stripe = getStripe();
 
@@ -43,22 +51,17 @@ async function createCheckoutSession({ amount, donationType, donorInfo, synagogu
   if (!isConfigured()) {
     console.log('[Stripe] No API key — returning mock session');
     return {
-      url: `${process.env.CLIENT_URL || 'http://localhost:5173'}/kiosk/${synagogue.id}?success=true&donationId=${donation.id}`,
+      url: `${getClientUrl()}/kiosk/${synagogue.id}?success=true&donationId=${donation.id}`,
       donationId: donation.id,
       mock: true,
     };
   }
 
   const amountInCents = Math.round(parseFloat(amount) * 100);
-  // In production CLIENT_URL must be set to the Railway public URL.
-  // Never fall back to localhost for real Stripe sessions.
-  const clientUrl = process.env.CLIENT_URL && !process.env.CLIENT_URL.includes('localhost')
-    ? process.env.CLIENT_URL
-    : 'https://truma-plus-production.up.railway.app';
+  const clientUrl = getClientUrl();
 
   const donorName = [donorFirstName, donorLastName].filter(Boolean).join(' ');
 
-  // Build donation type label
   const typeLabel = {
     general: 'General Donation',
     neder:   'Neder',
@@ -70,11 +73,21 @@ async function createCheckoutSession({ amount, donationType, donorInfo, synagogu
     seuda:   'Seuda',
   }[donationType] || 'Donation';
 
+  // Build payment_intent_data for Stripe Connect direct charges
+  const paymentIntentData = {};
+  if (synagogue.stripeAccountId && synagogue.stripeAccountStatus === 'active') {
+    paymentIntentData.transfer_data = { destination: synagogue.stripeAccountId };
+    // Optional platform fee (set STRIPE_PLATFORM_FEE_PERCENT=2 for 2%)
+    const feePercent = parseFloat(process.env.STRIPE_PLATFORM_FEE_PERCENT || '0');
+    if (feePercent > 0) {
+      paymentIntentData.application_fee_amount = Math.round(amountInCents * feePercent / 100);
+    }
+    console.log(`[Stripe] Using Connect account ${synagogue.stripeAccountId} for ${synagogue.synagogueName}`);
+  }
+
   const session = await stripe.checkout.sessions.create({
-    // No payment_method_types restriction → Stripe enables card, Apple Pay,
-    // Google Pay, Stripe Link automatically based on device/browser
     mode:            'payment',
-    customer_email:  donorEmail || undefined,   // pre-fills Stripe's email field
+    customer_email:  donorEmail || undefined,
     billing_address_collection: 'auto',
 
     line_items: [{
@@ -90,11 +103,9 @@ async function createCheckoutSession({ amount, donationType, donorInfo, synagogu
       quantity: 1,
     }],
 
-    // Return URLs
     success_url: `${clientUrl}/kiosk/${synagogue.id}?success=true&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url:  `${clientUrl}/kiosk/${synagogue.id}?cancelled=true`,
 
-    // Carry IDs through to webhook
     metadata: {
       donationId:   donation.id,
       synagogueId:  synagogue.id,
@@ -102,15 +113,15 @@ async function createCheckoutSession({ amount, donationType, donorInfo, synagogu
       donorName:    donorName || '',
     },
 
-    // Custom text shown to user in Stripe Checkout
     custom_text: {
       submit: {
         message: `Your donation to ${synagogue.synagogueName} will be processed securely. A receipt will be sent to your email.`,
       },
     },
+
+    ...(Object.keys(paymentIntentData).length > 0 && { payment_intent_data: paymentIntentData }),
   });
 
-  // Save Stripe session ID
   await prisma.donation.update({
     where: { id: donation.id },
     data:  { stripeSessionId: session.id },
@@ -119,6 +130,8 @@ async function createCheckoutSession({ amount, donationType, donorInfo, synagogu
   return { url: session.url, donationId: donation.id, sessionId: session.id };
 }
 
+// ── Webhook ───────────────────────────────────────────────────────────────────
+
 async function handleWebhookEvent(rawBody, signature) {
   const stripe        = getStripe();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -126,10 +139,8 @@ async function handleWebhookEvent(rawBody, signature) {
   let event;
 
   if (webhookSecret && !webhookSecret.includes('placeholder')) {
-    // Production: verify Stripe signature to prevent spoofing
     event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
   } else {
-    // Dev: parse raw body without verification
     console.warn('[Webhook] No STRIPE_WEBHOOK_SECRET — skipping signature verification');
     event = JSON.parse(rawBody.toString());
   }
@@ -140,8 +151,6 @@ async function handleWebhookEvent(rawBody, signature) {
     const donationId = session.metadata?.donationId;
     if (!donationId) return;
 
-    // Stripe ALWAYS collects the customer's email in Checkout.
-    // Use it to fill in donor info if it wasn't provided upfront.
     const stripeEmail = session.customer_details?.email || null;
     const stripeName  = session.customer_details?.name  || null;
     const nameParts   = stripeName ? stripeName.trim().split(/\s+/) : [];
@@ -151,7 +160,6 @@ async function handleWebhookEvent(rawBody, signature) {
       data: {
         paymentStatus: 'completed',
         transactionId: session.payment_intent,
-        // Backfill email/name from Stripe if not collected upfront
         ...(stripeEmail && { donorEmail: stripeEmail, receiptRequested: true }),
         ...(nameParts.length > 0 && {
           donorFirstName: nameParts[0],
@@ -161,13 +169,11 @@ async function handleWebhookEvent(rawBody, signature) {
       include: { synagogue: true },
     });
 
-    // Send receipt email (email is now guaranteed from Stripe)
     if (donation.donorEmail) {
       await sendReceiptEmail(donation, donation.synagogue).catch(console.error);
       await prisma.donation.update({ where: { id: donationId }, data: { receiptSent: true } });
     }
 
-    // Send thank-you SMS if phone was provided
     if (donation.donorPhone) {
       await sendThankYouSMS(donation, donation.synagogue).catch(console.error);
       await prisma.donation.update({ where: { id: donationId }, data: { smsSent: true } });
@@ -188,6 +194,140 @@ async function handleWebhookEvent(rawBody, signature) {
       });
     }
   }
+
+  // ── Stripe Connect: account updated ──────────────────────────────────────
+  if (event.type === 'account.updated') {
+    const account = event.data.object;
+    const synagogue = await prisma.synagogue.findFirst({
+      where: { stripeAccountId: account.id },
+    });
+    if (synagogue) {
+      let status;
+      if (account.charges_enabled && account.payouts_enabled) {
+        status = 'active';
+      } else if (account.details_submitted) {
+        status = 'restricted';
+      } else {
+        status = 'pending';
+      }
+      await prisma.synagogue.update({
+        where: { id: synagogue.id },
+        data:  { stripeAccountStatus: status },
+      });
+      console.log(`[Connect] Synagogue ${synagogue.synagogueName} → status: ${status}`);
+    }
+  }
 }
 
-module.exports = { createCheckoutSession, handleWebhookEvent };
+// ── Stripe Connect ────────────────────────────────────────────────────────────
+
+/**
+ * Creates a Stripe Express Connect account (if none exists) and returns an
+ * onboarding AccountLink URL. Safe to call multiple times — if the account
+ * already exists it just refreshes the link.
+ */
+async function createConnectAccountLink(synagogue) {
+  const stripe    = getStripe();
+  const clientUrl = getClientUrl();
+
+  let accountId = synagogue.stripeAccountId;
+
+  if (!accountId) {
+    // Create a new Express account
+    const account = await stripe.accounts.create({
+      type:    'express',
+      country: 'CA',
+      email:   synagogue.email,
+      capabilities: {
+        card_payments: { requested: true },
+        transfers:     { requested: true },
+      },
+      business_profile: {
+        name:                synagogue.synagogueName,
+        product_description: 'Charitable donations for a religious organization',
+      },
+    });
+
+    accountId = account.id;
+
+    await prisma.synagogue.update({
+      where: { id: synagogue.id },
+      data:  { stripeAccountId: accountId, stripeAccountStatus: 'pending' },
+    });
+
+    console.log(`[Connect] Created Stripe Express account ${accountId} for ${synagogue.synagogueName}`);
+  }
+
+  // Create (or refresh) the onboarding link
+  const accountLink = await stripe.accountLinks.create({
+    account:     accountId,
+    refresh_url: `${clientUrl}/dashboard`,
+    return_url:  `${clientUrl}/dashboard`,
+    type:        'account_onboarding',
+  });
+
+  return { url: accountLink.url, accountId };
+}
+
+/**
+ * Fetches the current Connect account status from Stripe and syncs it to DB.
+ */
+async function getConnectStatus(synagogueId) {
+  const stripe    = getStripe();
+  const synagogue = await prisma.synagogue.findUnique({ where: { id: synagogueId } });
+
+  if (!synagogue?.stripeAccountId) {
+    return { status: 'not_connected', accountId: null };
+  }
+
+  const account = await stripe.accounts.retrieve(synagogue.stripeAccountId);
+
+  let status;
+  if (account.charges_enabled && account.payouts_enabled) {
+    status = 'active';
+  } else if (account.details_submitted) {
+    status = 'restricted';
+  } else {
+    status = 'pending';
+  }
+
+  if (status !== synagogue.stripeAccountStatus) {
+    await prisma.synagogue.update({
+      where: { id: synagogueId },
+      data:  { stripeAccountStatus: status },
+    });
+  }
+
+  return {
+    status,
+    accountId:        synagogue.stripeAccountId,
+    chargesEnabled:   account.charges_enabled,
+    payoutsEnabled:   account.payouts_enabled,
+    detailsSubmitted: account.details_submitted,
+  };
+}
+
+/**
+ * Creates a Stripe Express Dashboard login link so the synagogue can manage
+ * their payouts, view balance, etc.
+ */
+async function createLoginLink(synagogueId) {
+  const stripe    = getStripe();
+  const synagogue = await prisma.synagogue.findUnique({ where: { id: synagogueId } });
+
+  if (!synagogue?.stripeAccountId) {
+    throw new Error('No Stripe Connect account for this synagogue');
+  }
+
+  const loginLink = await stripe.accounts.createLoginLink(synagogue.stripeAccountId);
+  return { url: loginLink.url };
+}
+
+module.exports = {
+  createCheckoutSession,
+  handleWebhookEvent,
+  createConnectAccountLink,
+  getConnectStatus,
+  createLoginLink,
+  isConfigured,
+};

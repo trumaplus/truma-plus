@@ -1,8 +1,77 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Trash2, ExternalLink, Building2, Edit2, LayoutDashboard, Check, X } from 'lucide-react';
+import { Plus, Trash2, ExternalLink, Building2, Edit2, LayoutDashboard, Check, X, CreditCard, Loader2, Copy } from 'lucide-react';
 import api from '../../api/client';
+
+// Stripe Connect status dot shown inline on each synagogue row
+const STRIPE_STATUS = {
+  active:        { dot: 'bg-emerald-400', label: 'Stripe Active',   text: 'text-emerald-400' },
+  pending:       { dot: 'bg-amber-400',   label: 'Stripe Pending',  text: 'text-amber-400'   },
+  restricted:    { dot: 'bg-orange-400',  label: 'Stripe Limited',  text: 'text-orange-400'  },
+  not_connected: { dot: 'bg-red-500',     label: 'Not Connected',   text: 'text-red-400'     },
+};
+
+function StripeStatusBadge({ status }) {
+  const cfg = STRIPE_STATUS[status] || STRIPE_STATUS.not_connected;
+  return (
+    <span className={`flex items-center gap-1 text-xs ${cfg.text} shrink-0`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  );
+}
+
+// Per-row connect link generator used by admin
+function SendConnectLinkButton({ synagogueId }) {
+  const [url, setUrl] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  const mut = useMutation({
+    mutationFn: () => api.post(`/stripe/connect/${synagogueId}`),
+    onSuccess: ({ data }) => {
+      setUrl(data.url);
+      window.open(data.url, '_blank', 'noopener,noreferrer');
+    },
+    onError: (err) => {
+      const e = err.response?.data;
+      if (e?.configMissing) toast.error('Set STRIPE_SECRET_KEY in Railway env vars first');
+      else toast.error(e?.error || 'Failed to generate link');
+    },
+  });
+
+  async function copyLink() {
+    if (!url) return;
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    toast.success('Link copied — send it to the gabai');
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={() => mut.mutate()}
+        disabled={mut.isPending}
+        title="Generate Stripe Connect onboarding link"
+        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium
+                   bg-gold-400/10 text-gold-400 hover:bg-gold-400/20 transition-colors"
+      >
+        {mut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3 h-3" />}
+        Send Link
+      </button>
+      {url && (
+        <button
+          onClick={copyLink}
+          title="Copy link"
+          className="p-1 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/10 transition-colors"
+        >
+          {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function SynagoguesList({ onEnterDashboard }) {
   const qc = useQueryClient();
@@ -203,13 +272,23 @@ export default function SynagoguesList({ onEnterDashboard }) {
                     </p>
                   </div>
 
+                  {/* Stripe Connect status */}
+                  <div className="shrink-0 hidden sm:block">
+                    <StripeStatusBadge status={s.stripeAccountStatus || 'not_connected'} />
+                  </div>
+
                   {/* Donation count */}
-                  <span className="text-white/25 text-xs shrink-0 hidden sm:block">
+                  <span className="text-white/25 text-xs shrink-0 hidden lg:block">
                     {s._count?.donations ?? 0} donations
                   </span>
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Stripe Connect — only show when not active */}
+                    {s.stripeAccountStatus !== 'active' && (
+                      <SendConnectLinkButton synagogueId={s.id} />
+                    )}
+
                     {/* Enter Dashboard */}
                     <button
                       onClick={() => onEnterDashboard(s.id)}

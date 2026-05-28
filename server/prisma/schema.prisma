@@ -35,6 +35,8 @@ model Synagogue {
   prayerTimes          String?
   emergencyNumbers     String?
   announcements        String?
+  stripeAccountId      String?     // Stripe Connect Express account ID
+  stripeAccountStatus  String?     // "pending" | "active" | "restricted"
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
   donations            Donation[]

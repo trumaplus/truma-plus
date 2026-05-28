@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Save, Upload, Lock } from 'lucide-react';
 import api from '../../api/client';
+import StripeConnectCard from './StripeConnectCard';
 
 export default function SynagogueSettingsForm({ synagogue }) {
   const qc = useQueryClient();
@@ -185,6 +186,14 @@ export default function SynagogueSettingsForm({ synagogue }) {
         <Save className="w-4 h-4" />
         {saveMut.isPending ? 'Saving…' : 'Save Settings'}
       </button>
+
+      {/* Stripe Connect */}
+      <div className="mt-10 pt-8 border-t border-white/10">
+        <h3 className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-4">
+          Payment Account
+        </h3>
+        <StripeConnectCard synagogueId={synagogue.id} synagogueName={synagogue.synagogueName} />
+      </div>
     </div>
   );
 }

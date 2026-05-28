@@ -45,6 +45,8 @@ router.get('/', requireAdmin, async (req, res) => {
       select: {
         ...SAFE_FIELDS,
         email: true, updatedAt: true,
+        stripeAccountId: true,
+        stripeAccountStatus: true,
         _count: { select: { donations: true } },
       },
       orderBy: { createdAt: 'desc' },
