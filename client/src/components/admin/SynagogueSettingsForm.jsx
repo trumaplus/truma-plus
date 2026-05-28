@@ -1,9 +1,92 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Save, Upload, Lock } from 'lucide-react';
+import { Save, Upload, Lock, KeyRound, Eye, EyeOff } from 'lucide-react';
 import api from '../../api/client';
 import StripeConnectCard from './StripeConnectCard';
+
+function ChangePasswordSection({ synagogueId }) {
+  const [newPassword,     setNewPassword]     = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNew,         setShowNew]         = useState(false);
+  const [showConfirm,     setShowConfirm]     = useState(false);
+
+  const mut = useMutation({
+    mutationFn: (password) => api.put(`/synagogues/${synagogueId}`, { password }),
+    onSuccess: () => {
+      toast.success('Password updated');
+      setNewPassword('');
+      setConfirmPassword('');
+    },
+    onError: () => toast.error('Failed to update password'),
+  });
+
+  function handleSubmit() {
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    mut.mutate(newPassword);
+  }
+
+  return (
+    <div className="mt-10 pt-8 border-t border-white/10">
+      <h3 className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-4 flex items-center gap-2">
+        <KeyRound className="w-3.5 h-3.5" />
+        Change Password
+      </h3>
+      <div className="grid grid-cols-2 gap-4 max-w-md">
+        <div className="relative">
+          <label className="text-sm text-white/60 mb-1.5 block">New Password</label>
+          <input
+            type={showNew ? 'text' : 'password'}
+            className="w-full input-dark pr-10"
+            placeholder="Min 6 characters"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={() => setShowNew(!showNew)}
+            className="absolute right-3 top-[38px] text-white/30 hover:text-white/60 transition-colors"
+          >
+            {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
+        <div className="relative">
+          <label className="text-sm text-white/60 mb-1.5 block">Confirm Password</label>
+          <input
+            type={showConfirm ? 'text' : 'password'}
+            className="w-full input-dark pr-10"
+            placeholder="Repeat password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+          />
+          <button
+            type="button"
+            onClick={() => setShowConfirm(!showConfirm)}
+            className="absolute right-3 top-[38px] text-white/30 hover:text-white/60 transition-colors"
+          >
+            {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+      <button
+        onClick={handleSubmit}
+        disabled={mut.isPending || !newPassword || !confirmPassword}
+        className="btn-outline mt-4 flex items-center gap-2 text-sm"
+      >
+        <KeyRound className="w-4 h-4" />
+        {mut.isPending ? 'Updating…' : 'Update Password'}
+      </button>
+    </div>
+  );
+}
 
 export default function SynagogueSettingsForm({ synagogue }) {
   const qc = useQueryClient();
@@ -186,6 +269,9 @@ export default function SynagogueSettingsForm({ synagogue }) {
         <Save className="w-4 h-4" />
         {saveMut.isPending ? 'Saving…' : 'Save Settings'}
       </button>
+
+      {/* Change Password */}
+      <ChangePasswordSection synagogueId={synagogue.id} />
 
       {/* Stripe Connect */}
       <div className="mt-10 pt-8 border-t border-white/10">
