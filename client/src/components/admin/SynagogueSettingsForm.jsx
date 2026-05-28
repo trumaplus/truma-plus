@@ -104,7 +104,7 @@ export default function SynagogueSettingsForm({ synagogue }) {
     latitude: synagogue.latitude || 45.5017,
     longitude: synagogue.longitude || -73.5673,
     candleLightingOffset: synagogue.candleLightingOffset || 18,
-    theme: synagogue.theme || 'dark',
+    theme: synagogue.theme || 'light',
     slideshowInterval: synagogue.slideshowInterval || 10,
     kioskPin: synagogue.kioskPin || '',
     hatzalahNumber: existingEmergency.hatzalah || '',

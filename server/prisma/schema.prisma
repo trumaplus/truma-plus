@@ -28,7 +28,7 @@ model Synagogue {
   longitude            Float       @default(-73.5673)
   candleLightingOffset Int         @default(18)
   logoUrl              String?
-  theme                String      @default("dark")
+  theme                String      @default("light")
   shabbatModeActive    Boolean     @default(false)
   slideshowInterval    Int         @default(10)
   kioskPin             String?

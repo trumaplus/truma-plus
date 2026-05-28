@@ -2,6 +2,7 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
 const { requireAdmin, requireAdminOrSynagogue, authenticate } = require('../middleware/auth');
+const { getIO } = require('../socket');
 
 const prisma = new PrismaClient();
 
@@ -107,6 +108,13 @@ router.put('/:id', requireAdminOrSynagogue, async (req, res) => {
     }
     const synagogue = await prisma.synagogue.update({ where: { id }, data });
     const { passwordHash: _, ...safe } = synagogue;
+
+    // Notify kiosk to reload content immediately (theme, announcements, etc.)
+    try {
+      const io = getIO();
+      if (io) io.to(id).emit('admin:command', { type: 'RELOAD_CONTENT' });
+    } catch { /* socket not ready */ }
+
     res.json(safe);
   } catch (err) {
     res.status(500).json({ error: err.message });

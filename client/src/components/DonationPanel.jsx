@@ -25,6 +25,22 @@ const T = {
 
 export default function DonationPanel({ synagogue, lang = 'en' }) {
   const t = T[lang] || T.en;
+  const isDark = synagogue?.theme !== 'light';
+
+  // Theme-aware classes
+  const card        = isDark ? 'card-glass'    : 'card-light';
+  const inputCls    = isDark ? 'input-dark'    : 'input-light';
+  const textMuted   = isDark ? 'text-white/50' : 'text-gray-500';
+  const textLabel   = isDark ? 'text-white/40' : 'text-gray-400';
+  const textBody    = isDark ? 'text-white/70' : 'text-gray-700';
+  const textFooter  = isDark ? 'text-white/20' : 'text-gray-400';
+  const btnInactive = isDark
+    ? 'bg-white/5 text-white/60 hover:bg-white/10'
+    : 'bg-gray-100 text-gray-600 hover:bg-gray-200';
+  const toggleBtn   = isDark
+    ? 'text-white/40 hover:text-white/60'
+    : 'text-gray-400 hover:text-gray-600';
+
   const [donationType, setDonationType] = useState('general');
   const [amount, setAmount] = useState(18);
   const [customAmount, setCustomAmount] = useState('');
@@ -65,8 +81,8 @@ export default function DonationPanel({ synagogue, lang = 'en' }) {
 
   return (
     <div className="h-full flex flex-col gap-3 overflow-hidden">
-      {/* Form card — scrolls internally when donor details expand */}
-      <div className="card-glass flex-1 min-h-0 flex flex-col overflow-hidden">
+      {/* Form card */}
+      <div className={`${card} flex-1 min-h-0 flex flex-col overflow-hidden`}>
         <div className="flex-1 min-h-0 overflow-y-auto p-5">
           <div className="flex items-center gap-2 mb-4">
             <Heart className="w-5 h-5 text-gold-400" />
@@ -75,7 +91,7 @@ export default function DonationPanel({ synagogue, lang = 'en' }) {
 
           {/* Donation Type */}
           <div className="mb-4">
-            <p className="text-white/50 text-xs mb-2 uppercase tracking-wide">{t.type}</p>
+            <p className={`${textMuted} text-xs mb-2 uppercase tracking-wide`}>{t.type}</p>
             <div className="grid grid-cols-2 gap-2">
               {DONATION_TYPES.map((dt) => (
                 <button
@@ -84,7 +100,7 @@ export default function DonationPanel({ synagogue, lang = 'en' }) {
                   className={`py-2 px-3 rounded-xl text-sm font-medium transition-all ${
                     donationType === dt.id
                       ? 'bg-gold-400 text-ink-900'
-                      : 'bg-white/5 text-white/60 hover:bg-white/10'
+                      : btnInactive
                   }`}
                 >
                   {dt[lang] || dt.en}
@@ -95,7 +111,7 @@ export default function DonationPanel({ synagogue, lang = 'en' }) {
 
           {/* Quick Amounts */}
           <div className="mb-4">
-            <p className="text-white/50 text-xs mb-2 uppercase tracking-wide">{t.amount} (CAD)</p>
+            <p className={`${textMuted} text-xs mb-2 uppercase tracking-wide`}>{t.amount} (CAD)</p>
             <div className="grid grid-cols-3 gap-2 mb-2">
               {QUICK_AMOUNTS.map((a) => (
                 <button
@@ -104,7 +120,7 @@ export default function DonationPanel({ synagogue, lang = 'en' }) {
                   className={`py-2.5 rounded-xl text-sm font-semibold transition-all ${
                     amount === a && !customAmount
                       ? 'bg-gold-400 text-ink-900 shadow-luxury-sm'
-                      : 'bg-white/5 text-white/70 hover:bg-white/10'
+                      : btnInactive
                   }`}
                 >
                   ${a}
@@ -117,14 +133,14 @@ export default function DonationPanel({ synagogue, lang = 'en' }) {
               placeholder={`${t.custom} $`}
               value={customAmount}
               onChange={(e) => setCustomAmount(e.target.value)}
-              className="w-full input-dark text-center text-lg font-semibold"
+              className={`w-full ${inputCls} text-center text-lg font-semibold`}
             />
           </div>
 
           {/* Donor Details Toggle */}
           <button
             onClick={() => setShowDetails(!showDetails)}
-            className="w-full flex items-center justify-between text-white/40 text-sm py-2 hover:text-white/60 transition-colors"
+            className={`w-full flex items-center justify-between ${toggleBtn} text-sm py-2 transition-colors`}
           >
             <span>{t.details}</span>
             {showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -136,14 +152,14 @@ export default function DonationPanel({ synagogue, lang = 'en' }) {
                 <input
                   type="text"
                   placeholder={t.firstName}
-                  className="input-dark text-sm"
+                  className={`${inputCls} text-sm`}
                   value={donor.firstName}
                   onChange={(e) => setDonor({ ...donor, firstName: e.target.value })}
                 />
                 <input
                   type="text"
                   placeholder={t.lastName}
-                  className="input-dark text-sm"
+                  className={`${inputCls} text-sm`}
                   value={donor.lastName}
                   onChange={(e) => setDonor({ ...donor, lastName: e.target.value })}
                 />
@@ -151,14 +167,14 @@ export default function DonationPanel({ synagogue, lang = 'en' }) {
               <input
                 type="email"
                 placeholder={t.email}
-                className="w-full input-dark text-sm"
+                className={`w-full ${inputCls} text-sm`}
                 value={donor.email}
                 onChange={(e) => setDonor({ ...donor, email: e.target.value })}
               />
               <input
                 type="tel"
                 placeholder={t.phone}
-                className="w-full input-dark text-sm"
+                className={`w-full ${inputCls} text-sm`}
                 value={donor.phone}
                 onChange={(e) => setDonor({ ...donor, phone: e.target.value })}
               />
@@ -167,18 +183,18 @@ export default function DonationPanel({ synagogue, lang = 'en' }) {
         </div>
       </div>
 
-      {/* Summary + Donate — always visible at bottom */}
-      <div className="card-glass p-5 shrink-0">
+      {/* Summary + Donate */}
+      <div className={`${card} p-5 shrink-0`}>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-white/40 text-xs">Donation</p>
-            <p className="text-white/70 text-sm">{typeLabel(donationType)}</p>
+            <p className={`${textLabel} text-xs`}>Donation</p>
+            <p className={`${textBody} text-sm`}>{typeLabel(donationType)}</p>
           </div>
           <div className="text-right">
-            <p className="text-white/40 text-xs">Amount</p>
+            <p className={`${textLabel} text-xs`}>Amount</p>
             <p className="text-2xl font-bold text-gold-400">
               ${finalAmount || '0'}
-              <span className="text-sm font-normal text-white/40 ml-1">CAD</span>
+              <span className={`text-sm font-normal ${textLabel} ml-1`}>CAD</span>
             </p>
           </div>
         </div>
@@ -191,7 +207,7 @@ export default function DonationPanel({ synagogue, lang = 'en' }) {
           {loading ? t.processing : `${t.donate} — $${finalAmount || 0}`}
         </button>
 
-        <p className="text-center text-white/20 text-xs mt-3">
+        <p className={`text-center ${textFooter} text-xs mt-3`}>
           Secure payment via Stripe · Tax receipt available
         </p>
       </div>
