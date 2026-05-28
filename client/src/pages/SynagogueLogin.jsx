@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import api from '../api/client';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 export default function Login() {
   const [form, setForm]       = useState({ email: '', password: '' });
@@ -42,6 +43,11 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-ink-900 flex items-center justify-center px-4">
+      {/* Language switcher — top right */}
+      <div className="fixed top-4 right-4 z-50">
+        <LanguageSwitcher />
+      </div>
+
       <div className="w-full max-w-md">
 
         {/* Logo */}

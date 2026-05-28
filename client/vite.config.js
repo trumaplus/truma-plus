@@ -43,8 +43,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
         runtimeCaching: [
           {
-            // Cache public synagogue data for offline display
-            urlPattern: /^https?:\/\/localhost:3001\/api\/synagogues\/public/,
+            // Cache public synagogue data for offline display (dev + production)
+            urlPattern: /\/api\/synagogues\/public/,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-synagogues',
@@ -53,8 +53,8 @@ export default defineConfig({
             },
           },
           {
-            // Cache media items list
-            urlPattern: /^https?:\/\/localhost:3001\/api\/media\//,
+            // Cache media items list (dev + production)
+            urlPattern: /\/api\/media\//,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-media',
