@@ -1,12 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { Minimize2 } from 'lucide-react';
 import api from '../api/client';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import PinUnlockModal from '../components/PinUnlockModal';
+import { useLongPress } from '../components/useLongPress';
+
+const KIOSK_PIN_KEY = 'dp_kiosk_pin'; // stored when entering kiosk mode
 
 export default function Login() {
   const [form, setForm]       = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement);
+  const [kioskPin]                       = useState(() => localStorage.getItem(KIOSK_PIN_KEY) || '');
+  const [showPinModal, setShowPinModal] = useState(false);
   const navigate = useNavigate();
 
   // Already logged in → go straight to the right dashboard
@@ -15,13 +23,39 @@ export default function Login() {
   if (existingToken && existingRole === 'synagogue') return <Navigate to="/dashboard" replace />;
   if (existingToken && existingRole === 'admin')     return <Navigate to="/admin"     replace />;
 
+  // Track fullscreen state
+  useEffect(() => {
+    function onChange() { setIsFullscreen(!!document.fullscreenElement); }
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  // ── Exit kiosk: 3-second long press ────────────────────────────────────────
+  const { progress: exitProgress, isHolding: exitHolding, handlers: exitHandlers } =
+    useLongPress(() => {
+      if (kioskPin) {
+        setShowPinModal(true);
+      } else {
+        doExitKiosk();
+      }
+    }, 3000);
+
+  function doExitKiosk() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+    // Release wake lock if any
+    navigator?.wakeLock?.request('screen').then((wl) => wl.release()).catch(() => {});
+    setShowPinModal(false);
+    toast.info('Exited kiosk mode');
+  }
+
+  // ── Login form ─────────────────────────────────────────────────────────────
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
     try {
-      // Single unified endpoint — server decides admin vs. gabai
       const { data } = await api.post('/auth/login', form);
-
       localStorage.setItem('dp_token', data.token);
       localStorage.setItem('dp_role',  data.role);
 
@@ -41,6 +75,10 @@ export default function Login() {
     }
   }
 
+  // Arc constants for the exit long-press indicator
+  const EXIT_R    = 26;
+  const EXIT_CIRC = 2 * Math.PI * EXIT_R;
+
   return (
     <div className="min-h-screen bg-ink-900 flex items-center justify-center px-4">
       {/* Language switcher — top right */}
@@ -48,8 +86,49 @@ export default function Login() {
         <LanguageSwitcher />
       </div>
 
-      <div className="w-full max-w-md">
+      {/* ── Exit Kiosk Mode section — only shown when in fullscreen ─────────── */}
+      {isFullscreen && (
+        <div className="fixed top-4 left-4 z-50">
+          <div className="relative">
+            <button
+              {...exitHandlers}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium
+                         bg-gold-400/15 border border-gold-400/30 text-gold-400
+                         hover:bg-gold-400/25 transition-all duration-200 select-none"
+              title="Hold 3 seconds to exit kiosk mode"
+            >
+              <Minimize2 className="w-4 h-4" />
+              Exit Kiosk
+              {/* Inline arc progress ring */}
+              {exitHolding && (
+                <svg
+                  className="absolute pointer-events-none"
+                  style={{
+                    top: '50%', left: '50%',
+                    transform: 'translate(-50%, -50%) rotate(-90deg)',
+                    width: 72, height: 72, zIndex: 10,
+                  }}
+                  viewBox="0 0 60 60"
+                >
+                  <circle cx="30" cy="30" r={EXIT_R} fill="rgba(0,0,0,0.55)" />
+                  <circle cx="30" cy="30" r={EXIT_R}
+                    fill="none" stroke="rgba(255,209,102,0.2)" strokeWidth="3" />
+                  <circle cx="30" cy="30" r={EXIT_R}
+                    fill="none" stroke="#ffd166" strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeDasharray={EXIT_CIRC}
+                    strokeDashoffset={EXIT_CIRC * (1 - exitProgress / 100)}
+                  />
+                </svg>
+              )}
+            </button>
+          </div>
 
+          <p className="text-white/25 text-xs mt-1.5 text-center">Hold 3 s to exit</p>
+        </div>
+      )}
+
+      <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-10">
           <Link to="/" className="inline-block">
@@ -65,9 +144,7 @@ export default function Login() {
             <div>
               <label className="text-sm text-white/60 mb-1.5 block">Email</label>
               <input
-                type="email"
-                required
-                autoComplete="email"
+                type="email" required autoComplete="email"
                 className="w-full input-dark"
                 placeholder="your@email.com"
                 value={form.email}
@@ -77,9 +154,7 @@ export default function Login() {
             <div>
               <label className="text-sm text-white/60 mb-1.5 block">Password</label>
               <input
-                type="password"
-                required
-                autoComplete="current-password"
+                type="password" required autoComplete="current-password"
                 className="w-full input-dark"
                 placeholder="••••••••"
                 value={form.password}
@@ -98,6 +173,15 @@ export default function Login() {
           </Link>
         </div>
       </div>
+
+      {/* PIN modal */}
+      {showPinModal && (
+        <PinUnlockModal
+          correctPin={kioskPin || '0000'}
+          onSuccess={doExitKiosk}
+          onCancel={() => setShowPinModal(false)}
+        />
+      )}
     </div>
   );
 }

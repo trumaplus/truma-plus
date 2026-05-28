@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 
+// ── Basic token verification ───────────────────────────────────────────────────
 function authenticate(req, res, next) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
@@ -14,6 +15,7 @@ function authenticate(req, res, next) {
   }
 }
 
+// ── Role guards ────────────────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
   authenticate(req, res, () => {
     if (req.user.role !== 'admin') {
@@ -41,4 +43,42 @@ function requireAdminOrSynagogue(req, res, next) {
   });
 }
 
-module.exports = { authenticate, requireAdmin, requireSynagogue, requireAdminOrSynagogue };
+/**
+ * requireOwnerOrAdmin(getIdFromReq)
+ *
+ * Middleware factory that enforces resource ownership:
+ *   - Admin → always allowed
+ *   - Synagogue → allowed only if JWT synagogueId === getIdFromReq(req)
+ *
+ * IMPORTANT: for synagogue role, the synagogueId is taken ONLY from the JWT,
+ * never from req.body or req.params, so it cannot be spoofed by the client.
+ *
+ * Usage:
+ *   router.put('/:id', requireOwnerOrAdmin((req) => req.params.id), handler)
+ */
+function requireOwnerOrAdmin(getIdFromReq) {
+  return (req, res, next) => {
+    authenticate(req, res, () => {
+      if (req.user.role === 'admin') return next();
+
+      if (req.user.role === 'synagogue') {
+        const resourceId = getIdFromReq(req);
+        // synagogueId from JWT is the only source of truth
+        if (!resourceId || req.user.synagogueId !== resourceId) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+        return next();
+      }
+
+      return res.status(403).json({ error: 'Access denied' });
+    });
+  };
+}
+
+module.exports = {
+  authenticate,
+  requireAdmin,
+  requireSynagogue,
+  requireAdminOrSynagogue,
+  requireOwnerOrAdmin,
+};

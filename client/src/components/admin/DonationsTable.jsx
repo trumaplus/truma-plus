@@ -17,11 +17,18 @@ export default function DonationsTable({ synagogueId }) {
   const { data: donations = [], isLoading } = useQuery({
     queryKey: ['donations', synagogueId, filter],
     queryFn: () => {
-      const params = filter !== 'all' ? `?status=${filter}` : '';
-      return api.get(`/donations${params}`).then((r) => r.data);
+      // Build query string — let the server filter by synagogueId (admin scoped view)
+      // and by status. For synagogue role the server automatically scopes to the JWT's
+      // synagogueId regardless of this param.
+      const params = new URLSearchParams();
+      if (filter !== 'all') params.set('status', filter);
+      if (synagogueId)      params.set('synagogueId', synagogueId);
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      return api.get(`/donations${qs}`).then((r) => r.data);
     },
   });
 
+  // Server already filters — this is a safety-net for stale cache entries only
   const filtered = synagogueId
     ? donations.filter((d) => d.synagogueId === synagogueId)
     : donations;

@@ -1,36 +1,34 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
-const { requireAdmin, requireAdminOrSynagogue, authenticate } = require('../middleware/auth');
+const { requireAdmin, requireAdminOrSynagogue, requireOwnerOrAdmin } = require('../middleware/auth');
 const { getIO } = require('../socket');
 
 const prisma = new PrismaClient();
 
+// Fields safe to return to any authenticated user viewing their own synagogue
 const SAFE_FIELDS = {
   id: true, synagogueName: true, synagogueCode: true, city: true,
   logoUrl: true, theme: true, shabbatModeActive: true,
   latitude: true, longitude: true, createdAt: true,
 };
 
-// GET /api/synagogues/public
-router.get('/public', async (req, res) => {
-  try {
-    const synagogues = await prisma.synagogue.findMany({
-      select: { ...SAFE_FIELDS, announcements: true, prayerTimes: true, slideshowInterval: true, candleLightingOffset: true },
-      orderBy: { synagogueName: 'asc' },
-    });
-    res.json(synagogues);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// ── Public (kiosk only) ────────────────────────────────────────────────────────
 
-// GET /api/synagogues/public/:id
+/**
+ * GET /api/synagogues/public/:id
+ * Used by the kiosk tablet to load its own synagogue's display data.
+ * No authentication required — kiosk runs without a logged-in user.
+ */
 router.get('/public/:id', async (req, res) => {
   try {
     const synagogue = await prisma.synagogue.findUnique({
       where: { id: req.params.id },
-      select: { ...SAFE_FIELDS, announcements: true, prayerTimes: true, emergencyNumbers: true, slideshowInterval: true, candleLightingOffset: true, kioskPin: true },
+      select: {
+        ...SAFE_FIELDS,
+        announcements: true, prayerTimes: true, emergencyNumbers: true,
+        slideshowInterval: true, candleLightingOffset: true, kioskPin: true,
+      },
     });
     if (!synagogue) return res.status(404).json({ error: 'Not found' });
     res.json(synagogue);
@@ -39,7 +37,12 @@ router.get('/public/:id', async (req, res) => {
   }
 });
 
-// GET /api/synagogues (Admin)
+// ── Admin-only ────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/synagogues
+ * Returns all synagogues — admin only.
+ */
 router.get('/', requireAdmin, async (req, res) => {
   try {
     const synagogues = await prisma.synagogue.findMany({
@@ -58,14 +61,19 @@ router.get('/', requireAdmin, async (req, res) => {
   }
 });
 
-// POST /api/synagogues (Admin)
+/**
+ * POST /api/synagogues
+ * Creates a synagogue — admin only.
+ */
 router.post('/', requireAdmin, async (req, res) => {
   try {
     const { synagogueName, email, password, city, synagogueCode, latitude, longitude, candleLightingOffset } = req.body;
     if (!synagogueName || !email || !password) {
       return res.status(400).json({ error: 'synagogueName, email, and password required' });
     }
-    const code = synagogueCode || synagogueName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '-' + Date.now().toString(36);
+    const code = synagogueCode ||
+      synagogueName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') +
+      '-' + Date.now().toString(36);
     const passwordHash = await bcrypt.hash(password, 10);
     const synagogue = await prisma.synagogue.create({
       data: { synagogueName, synagogueCode: code, email, passwordHash, city, latitude, longitude, candleLightingOffset },
@@ -78,14 +86,27 @@ router.post('/', requireAdmin, async (req, res) => {
   }
 });
 
-// GET /api/synagogues/:id
-router.get('/:id', requireAdminOrSynagogue, async (req, res) => {
+/**
+ * DELETE /api/synagogues/:id — admin only.
+ */
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
-    const { id } = req.params;
-    if (req.user.role === 'synagogue' && req.user.synagogueId !== id) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    const synagogue = await prisma.synagogue.findUnique({ where: { id } });
+    await prisma.synagogue.delete({ where: { id: req.params.id } });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Owner or Admin ────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/synagogues/:id
+ * Admin sees any synagogue; synagogue sees only their own (JWT-scoped).
+ */
+router.get('/:id', requireOwnerOrAdmin((req) => req.params.id), async (req, res) => {
+  try {
+    const synagogue = await prisma.synagogue.findUnique({ where: { id: req.params.id } });
     if (!synagogue) return res.status(404).json({ error: 'Not found' });
     const { passwordHash, ...safe } = synagogue;
     res.json(safe);
@@ -94,22 +115,28 @@ router.get('/:id', requireAdminOrSynagogue, async (req, res) => {
   }
 });
 
-// PUT /api/synagogues/:id
-router.put('/:id', requireAdminOrSynagogue, async (req, res) => {
+/**
+ * PUT /api/synagogues/:id
+ * Admin updates any synagogue; synagogue updates only their own.
+ * synagogueId for scoping is read from JWT, NOT from the request body.
+ */
+router.put('/:id', requireOwnerOrAdmin((req) => req.params.id), async (req, res) => {
   try {
     const { id } = req.params;
-    if (req.user.role === 'synagogue' && req.user.synagogueId !== id) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    const { passwordHash, id: _id, createdAt, ...data } = req.body;
+
+    // Strip fields that must never be updated via this route
+    const { passwordHash: _ph, id: _id, createdAt: _ca, ...data } = req.body;
+
+    // Hash password if provided in plain-text
     if (data.password) {
       data.passwordHash = await bcrypt.hash(data.password, 10);
       delete data.password;
     }
-    const synagogue = await prisma.synagogue.update({ where: { id }, data });
-    const { passwordHash: _, ...safe } = synagogue;
 
-    // Notify kiosk to reload content immediately (theme, announcements, etc.)
+    const synagogue = await prisma.synagogue.update({ where: { id }, data });
+    const { passwordHash, ...safe } = synagogue;
+
+    // Notify kiosk to reload content immediately
     try {
       const io = getIO();
       if (io) io.to(id).emit('admin:command', { type: 'RELOAD_CONTENT' });
@@ -121,25 +148,13 @@ router.put('/:id', requireAdminOrSynagogue, async (req, res) => {
   }
 });
 
-// DELETE /api/synagogues/:id (Admin)
-router.delete('/:id', requireAdmin, async (req, res) => {
+/**
+ * PUT /api/synagogues/:id/theme
+ */
+router.put('/:id/theme', requireOwnerOrAdmin((req) => req.params.id), async (req, res) => {
   try {
-    await prisma.synagogue.delete({ where: { id: req.params.id } });
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// PUT /api/synagogues/:id/theme
-router.put('/:id/theme', requireAdminOrSynagogue, async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (req.user.role === 'synagogue' && req.user.synagogueId !== id) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
     const { theme } = req.body;
-    await prisma.synagogue.update({ where: { id }, data: { theme } });
+    await prisma.synagogue.update({ where: { id: req.params.id }, data: { theme } });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

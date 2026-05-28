@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
-const { requireSynagogue } = require('../middleware/auth');
+const { requireOwnerOrAdmin } = require('../middleware/auth'); // requireSynagogue removed — all routes now use requireOwnerOrAdmin
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const path = require('path');
@@ -77,10 +77,9 @@ router.get('/:synagogueId', async (req, res) => {
 });
 
 // POST /api/media/:synagogueId
-router.post('/:synagogueId', requireSynagogue, upload.single('file'), async (req, res) => {
+router.post('/:synagogueId', requireOwnerOrAdmin((req) => req.params.synagogueId), upload.single('file'), async (req, res) => {
   try {
     const { synagogueId } = req.params;
-    if (req.user.synagogueId !== synagogueId) return res.status(403).json({ error: 'Access denied' });
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
 
     const mediaType = getMediaType(req.file.mimetype);
@@ -103,10 +102,9 @@ router.post('/:synagogueId', requireSynagogue, upload.single('file'), async (req
 });
 
 // PUT /api/media/:synagogueId/:id
-router.put('/:synagogueId/:id', requireSynagogue, async (req, res) => {
+router.put('/:synagogueId/:id', requireOwnerOrAdmin((req) => req.params.synagogueId), async (req, res) => {
   try {
     const { synagogueId, id } = req.params;
-    if (req.user.synagogueId !== synagogueId) return res.status(403).json({ error: 'Access denied' });
     const { order, active } = req.body;
     const item = await prisma.mediaItem.update({
       where: { id },
@@ -122,10 +120,9 @@ router.put('/:synagogueId/:id', requireSynagogue, async (req, res) => {
 });
 
 // DELETE /api/media/:synagogueId/:id
-router.delete('/:synagogueId/:id', requireSynagogue, async (req, res) => {
+router.delete('/:synagogueId/:id', requireOwnerOrAdmin((req) => req.params.synagogueId), async (req, res) => {
   try {
     const { synagogueId, id } = req.params;
-    if (req.user.synagogueId !== synagogueId) return res.status(403).json({ error: 'Access denied' });
     const item = await prisma.mediaItem.findUnique({ where: { id } });
     // Remove local file if applicable
     if (item?.url?.startsWith('/uploads/')) {
@@ -140,10 +137,9 @@ router.delete('/:synagogueId/:id', requireSynagogue, async (req, res) => {
 });
 
 // PUT /api/media/:synagogueId/reorder
-router.put('/:synagogueId/reorder', requireSynagogue, async (req, res) => {
+router.put('/:synagogueId/reorder', requireOwnerOrAdmin((req) => req.params.synagogueId), async (req, res) => {
   try {
     const { synagogueId } = req.params;
-    if (req.user.synagogueId !== synagogueId) return res.status(403).json({ error: 'Access denied' });
     const { items } = req.body;
     await Promise.all(items.map(({ id, order }) =>
       prisma.mediaItem.update({ where: { id }, data: { order } })

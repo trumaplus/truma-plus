@@ -20,12 +20,13 @@ function initSocket(server) {
     console.log(`Socket connected: ${socket.id}`);
 
     // Kiosk registers itself
-    socket.on('kiosk:register', ({ synagogueId, deviceInfo }) => {
+    socket.on('kiosk:register', ({ synagogueId, synagogueName, deviceInfo }) => {
       if (!synagogueId) return;
       socket.join(synagogueId);
       connectedKiosks.set(synagogueId, {
         socketId: socket.id,
         synagogueId,
+        synagogueName: synagogueName || null,
         deviceInfo: deviceInfo || {},
         lastSeen: new Date(),
         connected: true,

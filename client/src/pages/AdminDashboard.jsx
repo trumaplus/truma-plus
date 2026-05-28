@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LogOut, LayoutDashboard, Building2, DollarSign, Tablet } from 'lucide-react';
 import api from '../api/client';
 import SynagoguesList from '../components/admin/SynagoguesList';
@@ -17,6 +17,7 @@ const TABS = [
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [tab, setTab] = useState('overview');
 
   const { data: synagogues = [] } = useQuery({
@@ -30,8 +31,9 @@ export default function AdminDashboard() {
   });
 
   function logout() {
+    qc.clear();           // wipe React Query cache — prevents cross-session data leaks
     localStorage.clear();
-    navigate('/admin/login');
+    navigate('/login');
   }
 
   const completed   = donations.filter((d) => d.paymentStatus === 'completed');

@@ -9,6 +9,7 @@ export default function KioskControl({ synagogueId, synagogueName, isAdmin = fal
   const [kiosks, setKiosks] = useState([]);
   const [connected, setConnected] = useState(false);
   const [announcement, setAnnouncement] = useState('');
+  const [kioskAnnouncements, setKioskAnnouncements] = useState({}); // per-kiosk: { [synagogueId]: text }
   const socketRef = useRef(null);
   const token = localStorage.getItem('dp_token');
 
@@ -32,7 +33,7 @@ export default function KioskControl({ synagogueId, synagogueName, isAdmin = fal
         if (exists) return prev.map((k) => k.synagogueId === data.synagogueId ? { ...k, connected: true } : k);
         return [...prev, { ...data, connected: true }];
       });
-      toast.success(`Kiosk connected: ${data.synagogueId}`);
+      toast.success(`Kiosk connected: ${data.synagogueName || data.synagogueId}`);
     });
     socket.on('kiosk:disconnected', ({ synagogueId: sid }) => {
       setKiosks((prev) => prev.filter((k) => k.synagogueId !== sid));
@@ -134,7 +135,12 @@ export default function KioskControl({ synagogueId, synagogueName, isAdmin = fal
                   <div className="flex items-center gap-3">
                     <Wifi className="w-5 h-5 text-green-400" />
                     <div>
-                      <p className="text-white/80 font-medium">{kiosk.synagogueId}</p>
+                      <p className="text-white/80 font-medium">
+                        {kiosk.synagogueName || kiosk.synagogueId}
+                      </p>
+                      <p className="text-white/30 text-xs font-mono">
+                        {kiosk.synagogueName ? kiosk.synagogueId : null}
+                      </p>
                       <p className="text-white/30 text-xs">
                         Last seen: {kiosk.lastSeen ? new Date(kiosk.lastSeen).toLocaleTimeString() : '—'}
                       </p>
@@ -147,7 +153,7 @@ export default function KioskControl({ synagogueId, synagogueName, isAdmin = fal
                   )}
                 </div>
 
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 gap-2 mb-3">
                   <button onClick={() => sendCommand(kiosk.synagogueId, 'RELOAD_CONTENT', null)}
                     className="text-xs btn-outline py-2 px-2 flex items-center justify-center gap-1">
                     <RefreshCw className="w-3 h-3" /> Reload
@@ -163,6 +169,36 @@ export default function KioskControl({ synagogueId, synagogueName, isAdmin = fal
                   <button onClick={() => sendCommand(kiosk.synagogueId, 'RELOAD_PAGE', null)}
                     className="text-xs btn-outline py-2 px-2 flex items-center justify-center gap-1">
                     <RotateCcw className="w-3 h-3" /> Page
+                  </button>
+                </div>
+
+                {/* Per-kiosk announcement */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={kioskAnnouncements[kiosk.synagogueId] || ''}
+                    onChange={(e) =>
+                      setKioskAnnouncements((prev) => ({ ...prev, [kiosk.synagogueId]: e.target.value }))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && kioskAnnouncements[kiosk.synagogueId]?.trim()) {
+                        sendCommand(kiosk.synagogueId, 'SHOW_ANNOUNCEMENT', { text: kioskAnnouncements[kiosk.synagogueId] });
+                        setKioskAnnouncements((prev) => ({ ...prev, [kiosk.synagogueId]: '' }));
+                      }
+                    }}
+                    placeholder="Announcement for this kiosk…"
+                    className="flex-1 input-dark text-sm py-2"
+                  />
+                  <button
+                    onClick={() => {
+                      const text = kioskAnnouncements[kiosk.synagogueId]?.trim();
+                      if (!text) return;
+                      sendCommand(kiosk.synagogueId, 'SHOW_ANNOUNCEMENT', { text });
+                      setKioskAnnouncements((prev) => ({ ...prev, [kiosk.synagogueId]: '' }));
+                    }}
+                    className="btn-gold text-xs px-3 flex items-center gap-1.5"
+                  >
+                    <Megaphone className="w-3.5 h-3.5" /> Send
                   </button>
                 </div>
               </div>

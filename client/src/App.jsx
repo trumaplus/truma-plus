@@ -10,18 +10,38 @@ import PWAUpdateBanner from './components/PWAUpdateBanner';
 import { LanguageProvider } from './context/LanguageContext';
 
 /**
+ * Decode the JWT payload (base64 only).
+ * Signature verification happens on the server for every API call.
+ * This is used client-side only to read role / synagogueId without
+ * trusting tamper-able localStorage values.
+ */
+function decodeJwt(token) {
+  try {
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(b64));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Protects a route by role.
- * - No token           → redirect to the matching login page
- * - Wrong role         → redirect to that role's own dashboard (not home)
+ * - No token / malformed token / expired token → redirect to /login
+ * - Wrong role → redirect to that role's own dashboard
+ * Role is read from the JWT payload, NOT from localStorage (which can be tampered).
  */
 function ProtectedRoute({ children, requiredRole }) {
   const token = localStorage.getItem('dp_token');
-  const role  = localStorage.getItem('dp_role');
+  if (!token) return <Navigate to="/login" replace />;
 
-  if (!token) {
+  const payload = decodeJwt(token);
+  // Reject missing payload or expired token
+  if (!payload || (payload.exp && payload.exp * 1000 < Date.now())) {
+    localStorage.removeItem('dp_token');
     return <Navigate to="/login" replace />;
   }
 
+  const role = payload.role;
   if (role !== requiredRole) {
     // Admin trying to hit gabai route → send to admin dashboard (and vice-versa)
     return <Navigate to={role === 'admin' ? '/admin' : '/dashboard'} replace />;

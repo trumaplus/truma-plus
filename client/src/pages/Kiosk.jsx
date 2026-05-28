@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -13,29 +13,48 @@ import KioskModeButton from '../components/KioskModeButton';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useShabbatTimes } from '../components/useShabbatTimes';
 import { useLanguage } from '../context/LanguageContext';
+import { useLongPress } from '../components/useLongPress';
 
-// In production: same origin as client (Express serves both)
-// In dev: Vite proxy forwards /socket.io to localhost:3001
-const SOCKET_URL = window.location.origin;
+const SOCKET_URL  = window.location.origin;
+const IDLE_MS     = 30_000; // 30 s before countdown starts
+const COUNTDOWN_S = 10;     // 10 s countdown
+const GEAR_HOLD_MS = 3000;  // 3 s long-press to reach /login
+
+// Idle reset messages per language
+const IDLE_MSG = {
+  en: (n) => `Returning to home screen in ${n} seconds…`,
+  he: (n) => `חוזר למסך הראשי בעוד ${n} שניות…`,
+  fr: (n) => `Retour à l'écran principal dans ${n} secondes…`,
+  yi: (n) => `צוריק צום הויפּט-עקראַן אין ${n} סעקונדעס…`,
+};
+const IDLE_BTN = { en: 'Continue', he: 'המשך', fr: 'Continuer', yi: 'ווייַטער' };
 
 export default function Kiosk() {
   const { synagogueId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { lang } = useLanguage();            // setLang handled by LanguageSwitcher
+  const { lang } = useLanguage();
+
   const previewShabbat = searchParams.get('preview_shabbat') === '1';
   const [shabbatOverride, setShabbatOverride] = useState(previewShabbat ? true : null);
   const [announcement, setAnnouncement] = useState(null);
   const socketRef = useRef(null);
 
+  // ── Auto-reset state ───────────────────────────────────────────────────────
+  const [resetKey,  setResetKey]  = useState(0);
+  const [countdown, setCountdown] = useState(null); // null = idle, 1–10 = counting
+  const idleTimerRef  = useRef(null);
+  const countTimerRef = useRef(null);
+  const isShabbatRef  = useRef(false);
+
   const { data: synagogue, refetch: refetchSynagogue } = useQuery({
     queryKey: ['synagogue-public', synagogueId],
-    queryFn: () => api.get(`/synagogues/public/${synagogueId}`).then((r) => r.data),
+    queryFn:  () => api.get(`/synagogues/public/${synagogueId}`).then((r) => r.data),
   });
 
   const { data: mediaItems = [], refetch: refetchMedia } = useQuery({
     queryKey: ['media', synagogueId],
-    queryFn: () => api.get(`/media/${synagogueId}`).then((r) => r.data),
+    queryFn:  () => api.get(`/media/${synagogueId}`).then((r) => r.data),
   });
 
   const shabbatTimes = useShabbatTimes(synagogue?.latitude, synagogue?.longitude);
@@ -44,13 +63,71 @@ export default function Kiosk() {
     ? shabbatOverride
     : (synagogue?.shabbatModeActive || shabbatTimes.isShabbat);
 
-  // Success / cancel toasts
+  // Keep ref in sync so timer callbacks can read current value without stale closure
+  useEffect(() => { isShabbatRef.current = isShabbat; }, [isShabbat]);
+
+  // ── ⚙ Gabai button — 3-second long press ──────────────────────────────────
+  const { progress: gearProgress, isHolding: gearHolding, handlers: gearHandlers } =
+    useLongPress(() => navigate('/login'), GEAR_HOLD_MS);
+
+  // ── Idle / auto-reset logic ────────────────────────────────────────────────
+  const cancelCountdown = useCallback(() => {
+    clearInterval(countTimerRef.current);
+    setCountdown(null);
+  }, []);
+
+  const startCountdown = useCallback(() => {
+    setCountdown(COUNTDOWN_S);
+    countTimerRef.current = setInterval(() => {
+      setCountdown((n) => {
+        if (n <= 1) {
+          clearInterval(countTimerRef.current);
+          setResetKey((k) => k + 1); // remount DonationPanel → reset all state
+          return null;
+        }
+        return n - 1;
+      });
+    }, 1_000);
+  }, []);
+
+  const resetIdleTimer = useCallback(() => {
+    if (isShabbatRef.current) return;
+    cancelCountdown();
+    clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(startCountdown, IDLE_MS);
+  }, [cancelCountdown, startCountdown]);
+
+  // Global activity listeners
   useEffect(() => {
-    if (searchParams.get('success')) toast.success('Thank you for your donation! 🙏');
+    const events = ['touchstart', 'mousemove', 'mousedown', 'keydown'];
+    const handler = () => resetIdleTimer();
+    events.forEach((e) => window.addEventListener(e, handler, { passive: true }));
+    resetIdleTimer();
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, handler));
+      clearTimeout(idleTimerRef.current);
+      clearInterval(countTimerRef.current);
+    };
+  }, [resetIdleTimer]);
+
+  // Pause/resume idle timer when Shabbat mode toggles
+  useEffect(() => {
+    if (isShabbat) {
+      clearTimeout(idleTimerRef.current);
+      clearInterval(countTimerRef.current);
+      setCountdown(null);
+    } else {
+      resetIdleTimer();
+    }
+  }, [isShabbat, resetIdleTimer]);
+
+  // ── Success / cancel toasts ────────────────────────────────────────────────
+  useEffect(() => {
+    if (searchParams.get('success'))   toast.success('Thank you for your donation! 🙏');
     if (searchParams.get('cancelled')) toast.info('Donation cancelled.');
   }, []);
 
-  // Socket.io
+  // ── Socket.io ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
     socketRef.current = socket;
@@ -58,6 +135,7 @@ export default function Kiosk() {
     socket.on('connect', () => {
       socket.emit('kiosk:register', {
         synagogueId,
+        synagogueName: synagogue?.synagogueName || null,
         deviceInfo: { userAgent: navigator.userAgent, platform: navigator.platform },
       });
     });
@@ -89,7 +167,7 @@ export default function Kiosk() {
       socket.emit('kiosk:status', {
         synagogueId,
         shabbatMode: isShabbat,
-        timestamp: new Date().toISOString(),
+        timestamp:   new Date().toISOString(),
       });
     }, 30000);
 
@@ -97,9 +175,9 @@ export default function Kiosk() {
       clearInterval(statusInterval);
       socket.disconnect();
     };
-  }, [synagogueId]);
+  }, [synagogueId, synagogue?.synagogueName]);
 
-  // Apply dark/light theme to <html>
+  // ── Theme ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (synagogue?.theme === 'light') {
       document.documentElement.classList.remove('dark');
@@ -117,6 +195,7 @@ export default function Kiosk() {
     };
   }, [synagogue?.theme]);
 
+  // ── Loading ────────────────────────────────────────────────────────────────
   if (!synagogue) {
     return (
       <div className="min-h-screen bg-ink-900 flex items-center justify-center">
@@ -128,13 +207,70 @@ export default function Kiosk() {
     );
   }
 
-  const isDark = synagogue.theme !== 'light';
-  const bg = isDark ? 'bg-ink-900' : 'bg-gray-100';
-  const headerBg = isDark ? 'bg-ink-800/90 border-white/5' : 'bg-white/90 border-gray-200';
+  const isDark   = synagogue.theme !== 'light';
+  const bg       = isDark ? 'bg-ink-900'                    : 'bg-gray-100';
+  const headerBg = isDark ? 'bg-ink-800/90 border-white/5'  : 'bg-white/90 border-gray-200';
+  const idleMsg  = IDLE_MSG[lang] || IDLE_MSG.en;
+  const idleBtn  = IDLE_BTN[lang] || IDLE_BTN.en;
+
+  // SVG arc constants for gear long-press indicator
+  const GEAR_R = 22;
+  const GEAR_CIRC = 2 * Math.PI * GEAR_R;
 
   return (
     <div className={`h-screen overflow-hidden flex flex-col ${bg} font-body`}>
       {isShabbat && <ShabbatMode synagogue={synagogue} shabbatTimes={shabbatTimes} />}
+
+      {/* ── Idle countdown overlay ──────────────────────────────────────────── */}
+      {countdown !== null && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onMouseDown={resetIdleTimer}
+          onTouchStart={resetIdleTimer}
+        >
+          <div className="card-glass p-8 text-center max-w-sm mx-4 fade-in">
+            <p className="text-gold-400 font-display text-2xl mb-2 leading-snug">
+              {lang === 'he' || lang === 'yi' ? 'חוזר למסך הראשי…' : 'Returning to home screen…'}
+            </p>
+            <p className="text-white/50 text-sm mb-6">{idleMsg(countdown)}</p>
+            <div className="w-20 h-20 rounded-full border-4 border-gold-400/60 flex items-center
+                            justify-center mx-auto mb-6 relative">
+              <span className="text-gold-400 text-3xl font-bold font-mono">{countdown}</span>
+              <svg className="absolute inset-0 -rotate-90" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r="36" fill="none" stroke="#ffd166" strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 36}`}
+                  strokeDashoffset={`${2 * Math.PI * 36 * (1 - countdown / COUNTDOWN_S)}`}
+                  style={{ transition: 'stroke-dashoffset 0.9s linear' }}
+                />
+              </svg>
+            </div>
+            <button onClick={resetIdleTimer} className="btn-gold px-8">
+              {idleBtn}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Gear long-press overlay ─────────────────────────────────────────── */}
+      {gearHolding && (
+        <div className="fixed inset-0 z-[55] flex items-end justify-end pb-4 pr-4 pointer-events-none">
+          <div className="card-glass p-4 flex items-center gap-3 fade-in">
+            <svg width="48" height="48" viewBox="0 0 48 48" className="-rotate-90 shrink-0">
+              <circle cx="24" cy="24" r={GEAR_R} fill="rgba(0,0,0,0.4)" strokeWidth="0" />
+              <circle cx="24" cy="24" r={GEAR_R}
+                fill="none" stroke="rgba(255,209,102,0.25)" strokeWidth="3" />
+              <circle cx="24" cy="24" r={GEAR_R}
+                fill="none" stroke="#ffd166" strokeWidth="3"
+                strokeLinecap="round"
+                strokeDasharray={GEAR_CIRC}
+                strokeDashoffset={GEAR_CIRC * (1 - gearProgress / 100)}
+              />
+            </svg>
+            <span className="text-white/60 text-sm">Keep holding…</span>
+          </div>
+        </div>
+      )}
 
       {/* Floating announcement */}
       {announcement && (
@@ -148,11 +284,8 @@ export default function Kiosk() {
       <header className={`shrink-0 ${headerBg} border-b backdrop-blur-sm z-40`}>
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* App logo */}
             <img src="/logo.png" alt="Truma Plus" className="h-9 object-contain shrink-0" />
-            {/* Divider */}
             <span className={`w-px h-7 ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
-            {/* Synagogue logo + name */}
             {synagogue.logoUrl && (
               <img src={synagogue.logoUrl} alt="Logo" className="h-10 w-10 rounded-xl object-cover" />
             )}
@@ -167,24 +300,24 @@ export default function Kiosk() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Language selector */}
             <LanguageSwitcher isDark={isDark} />
+            <KioskModeButton isDark={isDark} kioskPin={synagogue.kioskPin || ''} />
 
-            {/* Kiosk Mode button */}
-            <KioskModeButton kioskPin={synagogue.kioskPin} isDark={isDark} />
-
-            {/* Gabai login button — subtle but visible */}
-            <button
-              onClick={() => navigate('/login')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all
-                ${isDark
-                  ? 'text-white/30 hover:text-gold-400 hover:bg-white/8 border border-white/10 hover:border-gold-400/30'
-                  : 'text-gray-400 hover:text-ink-900 hover:bg-gray-100 border border-gray-200'}`}
-              title="Gabai Login"
-            >
-              <Settings className="w-3.5 h-3.5" />
-              <span>Gabai</span>
-            </button>
+            {/* ⚙ Gabai — 3-second long press only */}
+            <div className="relative">
+              <button
+                {...gearHandlers}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium
+                            transition-all select-none
+                            ${isDark
+                              ? 'text-white/30 hover:text-gold-400 hover:bg-white/8 border border-white/10 hover:border-gold-400/30'
+                              : 'text-gray-400 hover:text-ink-900 hover:bg-gray-100 border border-gray-200'}`}
+                title="Hold 3 seconds for Gabai access"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>Gabai</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -192,12 +325,9 @@ export default function Kiosk() {
       {/* Main 3-column layout */}
       <main className="flex-1 min-h-0 max-w-7xl mx-auto w-full px-4 py-3 overflow-hidden">
         <div className="grid grid-cols-12 gap-4 h-full">
-          {/* Left — Announcements */}
           <div className="col-span-3 h-full min-h-0 overflow-hidden">
             <AnnouncementBoard synagogue={synagogue} lang={lang} />
           </div>
-
-          {/* Center — Media Slideshow */}
           <div className="col-span-5 h-full min-h-0">
             <MediaSlideshow
               mediaItems={mediaItems}
@@ -205,10 +335,9 @@ export default function Kiosk() {
               synagogueName={synagogue.synagogueName}
             />
           </div>
-
-          {/* Right — Donation Panel */}
           <div className="col-span-4 h-full min-h-0 overflow-hidden">
-            <DonationPanel synagogue={synagogue} lang={lang} />
+            {/* key={resetKey} forces full remount → resets all donation state */}
+            <DonationPanel key={resetKey} synagogue={synagogue} lang={lang} />
           </div>
         </div>
       </main>

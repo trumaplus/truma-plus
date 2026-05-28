@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LogOut, LayoutDashboard, DollarSign, Image, Bell, Settings, Tablet, ExternalLink } from 'lucide-react';
 import api from '../api/client';
 import DonationsTable from '../components/admin/DonationsTable';
@@ -19,10 +19,22 @@ const TABS = [
   { id: 'kiosk', label: 'Live Kiosk', icon: Tablet },
 ];
 
+/** Read synagogueId from JWT payload — not from localStorage (which can be tampered). */
+function getSynagogueIdFromToken() {
+  try {
+    const token = localStorage.getItem('dp_token') || '';
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(b64))?.synagogueId || '';
+  } catch { return ''; }
+}
+
 export default function SynagogueDashboard() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [tab, setTab] = useState('overview');
-  const synagogueId = localStorage.getItem('dp_synagogueId');
+  // synagogueId is sourced from the JWT — tamper-proof on the client, enforced on the server
+  const synagogueId = getSynagogueIdFromToken();
+  // Name is display-only; read from localStorage (falls back to server data once loaded)
   const synagogueName = localStorage.getItem('dp_synagogueName');
 
   const { data: synagogue } = useQuery({
@@ -38,6 +50,7 @@ export default function SynagogueDashboard() {
   });
 
   function logout() {
+    qc.clear();           // wipe React Query cache — prevents cross-session data leaks
     localStorage.clear();
     navigate('/login');
   }

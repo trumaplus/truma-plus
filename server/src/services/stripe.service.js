@@ -64,13 +64,12 @@ async function createCheckoutSession({ amount, donationType, donorInfo, synagogu
 
   const typeLabel = {
     general: 'General Donation',
-    neder:   'Neder',
-    aliyot:  'Aliyot',
-    kiddush: 'Kiddush',
-    standing:'Standing Donation',
-    yizkor:  'Yizkor',
-    coffee:  'Coffee Fund',
-    seuda:   'Seuda',
+    neder:   'Pledges & Donations',
+    aliyot:  'Torah Aliyot',
+    kiddush: 'Kiddush Payment',
+    standing:'Standing Order',
+    coffee:  'Coffee Expenses',
+    seuda:   'Seuda Shlishit',
   }[donationType] || 'Donation';
 
   // Build payment_intent_data for Stripe Connect direct charges

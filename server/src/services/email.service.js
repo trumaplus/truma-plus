@@ -101,14 +101,13 @@ function formatCurrency(amount, currency = 'CAD') {
 }
 
 const DONATION_TYPE_LABELS = {
-  general: { en: 'General Donation', he: 'תרומה כללית', fr: 'Don général',    yi: 'אַלגעמיינע נדבה' },
-  neder:   { en: 'Neder',            he: 'נדר',          fr: 'Vœu',            yi: 'נדר'              },
-  aliyot:  { en: 'Aliyot',           he: 'עליות',        fr: 'Aliyot',         yi: 'עליות'            },
-  kiddush: { en: 'Kiddush',          he: 'קידוש',        fr: 'Kiddouch',       yi: 'קידוש'            },
-  standing:{ en: 'Standing Donation',he: 'תרומה קבועה',  fr: 'Don régulier',   yi: 'שטענדיקע נדבה'   },
-  yizkor:  { en: 'Yizkor',           he: 'יזכור',        fr: 'Yizkor',         yi: 'יזכור'            },
-  coffee:  { en: 'Coffee Fund',      he: 'קרן קפה',      fr: 'Fonds café',     yi: 'קאַווע פאָנד'     },
-  seuda:   { en: 'Seuda',            he: 'סעודה',        fr: 'Seuda',          yi: 'סעודה'            },
+  general: { en: 'General Donation',    he: 'תרומה כללית',  fr: 'Don général',             yi: 'כללית נדבה'             },
+  neder:   { en: 'Pledges & Donations', he: 'נדרים ונדבות', fr: 'Vœux et dons',            yi: 'נדרים און נדבות'        },
+  aliyot:  { en: 'Torah Aliyot',        he: 'עליות לתורה',  fr: 'Montées à la Torah',      yi: 'עליות צו דער תורה'      },
+  kiddush: { en: 'Kiddush Payment',     he: 'תשלום קידוש',  fr: 'Paiement du Kiddouch',    yi: 'קידוש צאלונג'           },
+  standing:{ en: 'Standing Order',      he: 'הוראת קבע',    fr: 'Prélèvement automatique', yi: 'שטייענדיקע אָנווייזונג' },
+  coffee:  { en: 'Coffee Expenses',     he: 'הוצאות קפה',   fr: 'Frais de café',           yi: 'קאווע הוצאות'           },
+  seuda:   { en: 'Seuda Shlishit',      he: 'סעודה שלישית', fr: 'Séouda Shlishit',         yi: 'סעודה שלישית'           },
 };
 
 function getTypeLabel(donationType, lang = 'en') {
