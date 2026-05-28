@@ -8,6 +8,7 @@ import MediaManager from '../components/admin/MediaManager';
 import AnnouncementAdder from '../components/admin/AnnouncementAdder';
 import SynagogueSettingsForm from '../components/admin/SynagogueSettingsForm';
 import KioskControl from '../components/admin/KioskControl';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -97,7 +98,14 @@ export default function SynagogueDashboard() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 ml-64 flex flex-col">
+        {/* Top bar */}
+        <div className="sticky top-0 z-20 flex items-center justify-end px-6 py-2.5
+                        bg-ink-900/95 backdrop-blur-sm border-b border-white/5 shrink-0">
+          <LanguageSwitcher />
+        </div>
+
+        <div className="flex-1 p-8">
         {tab === 'overview' && (
           <div className="fade-in">
             <h2 className="font-display text-3xl text-white mb-8">Overview</h2>
@@ -166,6 +174,7 @@ export default function SynagogueDashboard() {
             </div>
           </div>
         )}
+        </div>{/* /flex-1 p-8 */}
       </main>
     </div>
   );

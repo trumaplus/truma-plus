@@ -7,7 +7,6 @@ import SynagogueDashboard from './pages/SynagogueDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminSynagogueView from './pages/AdminSynagogueView';
 import PWAUpdateBanner from './components/PWAUpdateBanner';
-import LanguageSwitcher from './components/LanguageSwitcher';
 import { LanguageProvider } from './context/LanguageContext';
 
 /**
@@ -37,7 +36,6 @@ export default function App() {
       <BrowserRouter>
         <Toaster position="top-right" richColors theme="dark" />
         <PWAUpdateBanner />
-        <LanguageSwitcher />
         <Routes>
           {/* Public */}
           <Route path="/"                   element={<Home />} />

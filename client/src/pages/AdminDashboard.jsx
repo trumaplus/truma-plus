@@ -6,6 +6,7 @@ import api from '../api/client';
 import SynagoguesList from '../components/admin/SynagoguesList';
 import DonationsTable from '../components/admin/DonationsTable';
 import KioskControl from '../components/admin/KioskControl';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 const TABS = [
   { id: 'overview',    label: 'Overview',       icon: LayoutDashboard },
@@ -78,8 +79,14 @@ export default function AdminDashboard() {
       </aside>
 
       {/* Content */}
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 ml-64 flex flex-col">
+        {/* Top bar */}
+        <div className="sticky top-0 z-20 flex items-center justify-end px-6 py-2.5
+                        bg-ink-900/95 backdrop-blur-sm border-b border-white/5 shrink-0">
+          <LanguageSwitcher />
+        </div>
 
+        <div className="flex-1 p-8">
         {/* ── Overview ── */}
         {tab === 'overview' && (
           <div className="fade-in">
@@ -137,6 +144,7 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+        </div>{/* /flex-1 p-8 */}
       </main>
     </div>
   );

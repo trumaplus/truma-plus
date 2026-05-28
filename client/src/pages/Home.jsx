@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Search, MapPin, ChevronRight, Star } from 'lucide-react';
 import api from '../api/client';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 export default function Home() {
   const [search, setSearch] = useState('');
@@ -26,12 +27,15 @@ export default function Home() {
       <header className="border-b border-white/5 bg-ink-800/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <img src="/logo.png" alt="Truma Plus" className="h-10 object-contain" />
-          <button
-            onClick={() => navigate('/login')}
-            className="text-sm text-white/50 hover:text-gold-400 transition-colors"
-          >
-            Gabai Login →
-          </button>
+          <div className="flex items-center gap-4">
+            <LanguageSwitcher />
+            <button
+              onClick={() => navigate('/login')}
+              className="text-sm text-white/50 hover:text-gold-400 transition-colors"
+            >
+              Gabai Login →
+            </button>
+          </div>
         </div>
       </header>
 

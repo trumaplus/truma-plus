@@ -10,8 +10,9 @@ import MediaSlideshow from '../components/MediaSlideshow';
 import DonationPanel from '../components/DonationPanel';
 import ShabbatMode from '../components/ShabbatMode';
 import KioskModeButton from '../components/KioskModeButton';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useShabbatTimes } from '../components/useShabbatTimes';
-import { useLanguage, LANGS } from '../context/LanguageContext';
+import { useLanguage } from '../context/LanguageContext';
 
 // In production: same origin as client (Express serves both)
 // In dev: Vite proxy forwards /socket.io to localhost:3001
@@ -21,7 +22,7 @@ export default function Kiosk() {
   const { synagogueId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { lang, setLang } = useLanguage();   // global language context
+  const { lang } = useLanguage();            // setLang handled by LanguageSwitcher
   const [shabbatOverride, setShabbatOverride] = useState(null);
   const [announcement, setAnnouncement] = useState(null);
   const socketRef = useRef(null);
@@ -166,21 +167,7 @@ export default function Kiosk() {
 
           <div className="flex items-center gap-2">
             {/* Language selector */}
-            <div className="flex gap-1 mr-1">
-              {LANGS.map((l) => (
-                <button
-                  key={l.code}
-                  onClick={() => setLang(l.code)}
-                  className={`px-2 py-1 rounded-lg text-xs font-medium transition-all ${
-                    lang === l.code
-                      ? 'bg-gold-400 text-ink-900'
-                      : isDark ? 'text-white/40 hover:text-white/70' : 'text-gray-400 hover:text-gray-700'
-                  }`}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
+            <LanguageSwitcher isDark={isDark} />
 
             {/* Kiosk Mode button */}
             <KioskModeButton kioskPin={synagogue.kioskPin} isDark={isDark} />
