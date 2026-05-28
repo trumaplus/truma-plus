@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Save, Upload, Lock, KeyRound, Eye, EyeOff, Phone } from 'lucide-react';
+import { Save, Upload, Lock, KeyRound, Eye, EyeOff, Phone, Moon } from 'lucide-react';
 import api from '../../api/client';
 import StripeConnectCard from './StripeConnectCard';
 
@@ -290,14 +290,26 @@ export default function SynagogueSettingsForm({ synagogue }) {
         </div>
       </div>
 
-      <button
-        onClick={() => saveMut.mutate(form)}
-        disabled={saveMut.isPending}
-        className="btn-gold mt-8 flex items-center gap-2"
-      >
-        <Save className="w-4 h-4" />
-        {saveMut.isPending ? 'Saving…' : 'Save Settings'}
-      </button>
+      <div className="flex items-center gap-3 mt-8">
+        <button
+          onClick={() => saveMut.mutate(form)}
+          disabled={saveMut.isPending}
+          className="btn-gold flex items-center gap-2"
+        >
+          <Save className="w-4 h-4" />
+          {saveMut.isPending ? 'Saving…' : 'Save Settings'}
+        </button>
+
+        <a
+          href={`/kiosk/${synagogue.id}?preview_shabbat=1`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-outline flex items-center gap-2 text-sm"
+        >
+          <Moon className="w-4 h-4 text-gold-400" />
+          Preview Shabbat Mode
+        </a>
+      </div>
 
       {/* Change Password */}
       <ChangePasswordSection synagogueId={synagogue.id} />

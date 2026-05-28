@@ -23,7 +23,8 @@ export default function Kiosk() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { lang } = useLanguage();            // setLang handled by LanguageSwitcher
-  const [shabbatOverride, setShabbatOverride] = useState(null);
+  const previewShabbat = searchParams.get('preview_shabbat') === '1';
+  const [shabbatOverride, setShabbatOverride] = useState(previewShabbat ? true : null);
   const [announcement, setAnnouncement] = useState(null);
   const socketRef = useRef(null);
 
