@@ -1,11 +1,40 @@
 import { useState, useEffect } from 'react';
-import { Bell, Clock, BookOpen } from 'lucide-react';
+import { Bell, Clock, BookOpen, Sun } from 'lucide-react';
+import { useZmanim } from './useZmanim';
 
 const TRANSLATIONS = {
-  en: { announcements: 'Announcements', prayerTimes: 'Prayer Times', today: 'Today', shabbat: 'Shabbat' },
-  he: { announcements: 'הודעות', prayerTimes: 'זמני תפילה', today: 'היום', shabbat: 'שבת' },
-  fr: { announcements: 'Annonces', prayerTimes: 'Horaires de prière', today: "Aujourd'hui", shabbat: 'Chabbat' },
-  yi: { announcements: 'בשרייבונגען', prayerTimes: 'דאַוונצייטן', today: 'היינט', shabbat: 'שבת' },
+  en: {
+    announcements: 'Announcements', prayerTimes: 'Prayer Times',
+    today: 'Today', shabbat: 'Shabbat',
+    zmanHeader: 'Daily Zmanim',
+    shmaGRA: 'Shema (GRA)', shmaMGA: 'Shema (M"A)',
+    shacharitGRA: 'Shacharit (GRA)', shacharitMGA: 'Shacharit (M"A)',
+    sunset: 'Sunset',
+  },
+  he: {
+    announcements: 'הודעות', prayerTimes: 'זמני תפילה',
+    today: 'היום', shabbat: 'שבת',
+    zmanHeader: 'זמנים הלכתיים',
+    shmaGRA: 'ק"ש (גר"א)', shmaMGA: 'ק"ש (מג"א)',
+    shacharitGRA: 'שחרית (גר"א)', shacharitMGA: 'שחרית (מג"א)',
+    sunset: 'שקיעה',
+  },
+  fr: {
+    announcements: 'Annonces', prayerTimes: 'Horaires de prière',
+    today: "Aujourd'hui", shabbat: 'Chabbat',
+    zmanHeader: 'Zmanim du jour',
+    shmaGRA: 'Chema (GRA)', shmaMGA: 'Chema (M"A)',
+    shacharitGRA: 'Chacharit (GRA)', shacharitMGA: 'Chacharit (M"A)',
+    sunset: 'Coucher',
+  },
+  yi: {
+    announcements: 'בשרייבונגען', prayerTimes: 'דאַוונצייטן',
+    today: 'היינט', shabbat: 'שבת',
+    zmanHeader: 'הלכה צייטן',
+    shmaGRA: 'ק"ש (גר"א)', shmaMGA: 'ק"ש (מג"א)',
+    shacharitGRA: 'שחרית (גר"א)', shacharitMGA: 'שחרית (מג"א)',
+    sunset: 'שקיעה',
+  },
 };
 
 function to24h(timeStr) {
@@ -29,10 +58,16 @@ function hebrewDate() {
   }
 }
 
+function fmt(iso) {
+  if (!iso) return '--:--';
+  return new Date(iso).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
 export default function AnnouncementBoard({ synagogue, lang = 'en' }) {
   const [time, setTime] = useState(new Date());
   const t = TRANSLATIONS[lang] || TRANSLATIONS.en;
   const isDark = synagogue?.theme !== 'light';
+  const zmanim = useZmanim(synagogue?.latitude, synagogue?.longitude);
   const card  = isDark ? 'card-glass' : 'card-light';
   const textMuted  = isDark ? 'text-white/40'  : 'text-gray-500';
   const textMain   = isDark ? 'text-white/75'  : 'text-gray-800';
@@ -109,7 +144,33 @@ export default function AnnouncementBoard({ synagogue, lang = 'en' }) {
         </div>
       )}
 
-      {/* Parasha (placeholder) */}
+      {/* Halachic Zmanim */}
+      {zmanim && (
+        <div className={`${card} p-4 shrink-0`}>
+          <div className="flex items-center gap-2 mb-2">
+            <Sun className="w-4 h-4 text-gold-400" />
+            <span className="text-gold-400 text-sm font-semibold tracking-wide uppercase">
+              {t.zmanHeader}
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {[
+              { label: t.shmaGRA,      val: zmanim.shmaGRA      },
+              { label: t.shmaMGA,      val: zmanim.shmaMGA      },
+              { label: t.shacharitGRA, val: zmanim.shacharitGRA },
+              { label: t.shacharitMGA, val: zmanim.shacharitMGA },
+              { label: t.sunset,       val: zmanim.sunset        },
+            ].map(({ label, val }) => (
+              <div key={label} className="flex justify-between items-center text-sm">
+                <span className={`${textMuted} text-xs`}>{label}</span>
+                <span className={`${textStrong} font-mono text-xs`}>{fmt(val)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Parasha */}
       <div className={`${card} p-3 text-center shrink-0`}>
         <BookOpen className="w-4 h-4 text-gold-400/50 mx-auto mb-1" />
         <p className={`${textMuted} text-xs`}>Weekly Portion</p>
