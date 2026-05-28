@@ -46,6 +46,7 @@ export default function DonationPanel({ synagogue, lang = 'en' }) {
         donationType,
         donorInfo: { ...donor },
         synagogueId: synagogue.id,
+        lang,
       });
       if (data.url) {
         window.location.href = data.url;

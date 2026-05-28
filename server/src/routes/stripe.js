@@ -17,13 +17,13 @@ const prisma = new PrismaClient();
 // POST /api/stripe/checkout
 router.post('/checkout', async (req, res) => {
   try {
-    const { amount, donationType, donorInfo, synagogueId } = req.body;
+    const { amount, donationType, donorInfo, synagogueId, lang } = req.body;
     if (!amount || !synagogueId) return res.status(400).json({ error: 'amount and synagogueId required' });
 
     const synagogue = await prisma.synagogue.findUnique({ where: { id: synagogueId } });
     if (!synagogue) return res.status(404).json({ error: 'Synagogue not found' });
 
-    const result = await createCheckoutSession({ amount, donationType, donorInfo, synagogue });
+    const result = await createCheckoutSession({ amount, donationType, donorInfo, synagogue, lang });
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });

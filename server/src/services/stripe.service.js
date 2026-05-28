@@ -23,7 +23,7 @@ function getClientUrl() {
 
 // ── Checkout Session ─────────────────────────────────────────────────────────
 
-async function createCheckoutSession({ amount, donationType, donorInfo, synagogue }) {
+async function createCheckoutSession({ amount, donationType, donorInfo, synagogue, lang }) {
   const stripe = getStripe();
 
   const donorFirstName = donorInfo?.firstName?.trim() || null;
@@ -111,6 +111,7 @@ async function createCheckoutSession({ amount, donationType, donorInfo, synagogu
       synagogueId:  synagogue.id,
       donationType: donationType || 'general',
       donorName:    donorName || '',
+      lang:         lang || 'en',
     },
 
     custom_text: {
@@ -155,6 +156,8 @@ async function handleWebhookEvent(rawBody, signature) {
     const stripeName  = session.customer_details?.name  || null;
     const nameParts   = stripeName ? stripeName.trim().split(/\s+/) : [];
 
+    const emailLang = session.metadata?.lang || 'en';
+
     const donation = await prisma.donation.update({
       where: { id: donationId },
       data: {
@@ -170,7 +173,7 @@ async function handleWebhookEvent(rawBody, signature) {
     });
 
     if (donation.donorEmail) {
-      await sendReceiptEmail(donation, donation.synagogue).catch(console.error);
+      await sendReceiptEmail(donation, donation.synagogue, emailLang).catch(console.error);
       await prisma.donation.update({ where: { id: donationId }, data: { receiptSent: true } });
     }
 
