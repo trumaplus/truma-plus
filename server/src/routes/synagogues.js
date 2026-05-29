@@ -13,7 +13,24 @@ const SAFE_FIELDS = {
   latitude: true, longitude: true, createdAt: true,
 };
 
-// ── Public (kiosk only) ────────────────────────────────────────────────────────
+// ── Public ────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/synagogues/public
+ * Returns a minimal public list for the home page (donor-facing).
+ * Only exposes display-safe fields — NO email, PIN, Stripe, or sensitive data.
+ */
+router.get('/public', async (req, res) => {
+  try {
+    const synagogues = await prisma.synagogue.findMany({
+      select: { id: true, synagogueName: true, synagogueCode: true, city: true, logoUrl: true },
+      orderBy: { synagogueName: 'asc' },
+    });
+    res.json(synagogues);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /**
  * GET /api/synagogues/public/:id
