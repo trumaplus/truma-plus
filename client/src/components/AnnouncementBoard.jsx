@@ -37,18 +37,51 @@ const TRANSLATIONS = {
   },
 };
 
-// ── Prayer name translations ───────────────────────────────────────────────────
-const PRAYER_NAMES = {
-  kabbalatShabbat: { en: 'Kabbalat Shabbat', he: 'קבלת שבת',    fr: 'Kabbala Chabbat',       yi: 'קבלת שבת'    },
-  shacharit:       { en: 'Shacharit',         he: 'שחרית',       fr: 'Chacharit',             yi: 'שחרית'       },
-  minchaGedola:    { en: 'Mincha Gedola',     he: 'מנחה גדולה',  fr: 'Minha Gedola',          yi: 'מנחה גדולה'  },
-  mincha:          { en: 'Mincha',            he: 'מנחה',        fr: 'Minha',                 yi: 'מנחה'        },
-  maariv:          { en: 'Maariv',            he: 'ערבית',       fr: 'Arvit',                 yi: 'מעריב'       },
-  motzeiShabbat:   { en: 'Motzei Shabbat',    he: 'מוצ"ש',       fr: "Motsa'é Chabbat",       yi: 'מוצ"ש'       },
+// ── Legacy prayer name translations (for old { weekday:{}, shabbat:{} } format) ─
+const LEGACY_PRAYER_NAMES = {
+  kabbalatShabbat: { en: 'Kabbalat Shabbat', he: 'קבלת שבת',   fr: 'Kabbala Chabbat',  yi: 'קבלת שבת'   },
+  shacharit:       { en: 'Shacharit',         he: 'שחרית',      fr: 'Chacharit',        yi: 'שחרית'      },
+  minchaGedola:    { en: 'Mincha Gedola',     he: 'מנחה גדולה', fr: 'Minha Gedola',     yi: 'מנחה גדולה' },
+  mincha:          { en: 'Mincha',            he: 'מנחה',       fr: 'Minha',            yi: 'מנחה'       },
+  maariv:          { en: 'Maariv',            he: 'ערבית',      fr: 'Arvit',            yi: 'מעריב'      },
+  motzeiShabbat:   { en: 'Motzei Shabbat',    he: 'מוצ"ש',      fr: "Motsa'é Chabbat",  yi: 'מוצ"ש'      },
 };
+const LEGACY_ORDER = ['kabbalatShabbat','shacharit','minchaGedola','mincha','maariv','motzeiShabbat'];
 
-// Canonical display order for prayer entries
-const PRAYER_ORDER = ['kabbalatShabbat', 'shacharit', 'minchaGedola', 'mincha', 'maariv', 'motzeiShabbat'];
+/**
+ * Resolves prayer entries for display — handles both formats:
+ *   New: Array<{ id, label, weekday, shabbat }>
+ *   Old: { weekday: { shacharit: '07:00', ... }, shabbat: { ... } }
+ * Returns [{ key, label, time }] — only non-empty entries.
+ */
+function getPrayerEntries(prayerTimes, isWeekend, lang) {
+  if (!prayerTimes) return [];
+
+  // ── New array format ───────────────────────────────────────────────────────
+  if (Array.isArray(prayerTimes)) {
+    return prayerTimes
+      .filter((p) => {
+        const t = isWeekend ? p.shabbat : p.weekday;
+        return p.label?.trim() && t?.trim();
+      })
+      .map((p) => ({
+        key:   p.id,
+        label: p.label,
+        time:  to24h(isWeekend ? p.shabbat : p.weekday),
+      }));
+  }
+
+  // ── Legacy object format ───────────────────────────────────────────────────
+  const obj = isWeekend ? prayerTimes.shabbat : prayerTimes.weekday;
+  if (!obj) return [];
+  return LEGACY_ORDER
+    .filter((k) => obj[k] && String(obj[k]).trim())
+    .map((k) => ({
+      key:   k,
+      label: (LEGACY_PRAYER_NAMES[k] || {})[lang] || k,
+      time:  to24h(obj[k]),
+    }));
+}
 
 function to24h(timeStr) {
   if (!timeStr || typeof timeStr !== 'string') return timeStr;
@@ -138,19 +171,9 @@ export default function AnnouncementBoard({ synagogue, lang = 'en' }) {
         </div>
       )}
 
-      {/* Prayer Times — ordered, translated, empty-filtered */}
+      {/* Prayer Times — handles new array format + legacy object format */}
       {(() => {
-        if (!prayerTimes) return null;
-        const prayersObj = isWeekend ? prayerTimes.shabbat : prayerTimes.weekday;
-        if (!prayersObj) return null;
-        // Keep canonical order; skip empty / null / whitespace-only values
-        const entries = PRAYER_ORDER
-          .filter((key) => prayersObj[key] && String(prayersObj[key]).trim())
-          .map((key) => ({
-            key,
-            label: (PRAYER_NAMES[key] || {})[lang] || key,
-            time:  to24h(prayersObj[key]),
-          }));
+        const entries = getPrayerEntries(prayerTimes, isWeekend, lang);
         if (entries.length === 0) return null;
         return (
           <div className={`${card} p-4 shrink-0`}>

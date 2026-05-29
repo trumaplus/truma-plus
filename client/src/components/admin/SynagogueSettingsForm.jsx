@@ -1,65 +1,65 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Save, Upload, Lock, KeyRound, Eye, EyeOff, Phone, Moon, Clock } from 'lucide-react';
+import {
+  Save, Upload, Lock, KeyRound, Eye, EyeOff, Phone, Moon,
+  Clock, Trash2, Plus,
+} from 'lucide-react';
 import api from '../../api/client';
 import StripeConnectCard from './StripeConnectCard';
 
-// ── Prayer times helpers ───────────────────────────────────────────────────────
+// ── Prayer-list helpers ────────────────────────────────────────────────────────
 
-function parsePrayerTimes(raw) {
+function uid() { return Math.random().toString(36).slice(2, 9); }
+
+const DEFAULT_PRAYER_LIST = () => [
+  { id: uid(), label: 'שחרית',    weekday: '', shabbat: '' },
+  { id: uid(), label: 'מנחה',     weekday: '', shabbat: '' },
+  { id: uid(), label: 'ערבית',    weekday: '', shabbat: '' },
+];
+
+/** Convert any stored format → flat array */
+function parsePrayerList(raw) {
   try {
-    const pt = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
-    return {
-      weekday_shacharit:       pt.weekday?.shacharit        || '',
-      weekday_minchaGedola:    pt.weekday?.minchaGedola     || '',
-      weekday_mincha:          pt.weekday?.mincha            || '',
-      weekday_maariv:          pt.weekday?.maariv            || '',
-      shabbat_kabbalatShabbat: pt.shabbat?.kabbalatShabbat  || '',
-      shabbat_shacharit:       pt.shabbat?.shacharit         || '',
-      shabbat_mincha:          pt.shabbat?.mincha            || '',
-      shabbat_motzeiShabbat:   pt.shabbat?.motzeiShabbat    || '',
+    const data = typeof raw === 'string' ? JSON.parse(raw) : (raw || null);
+    if (!data) return DEFAULT_PRAYER_LIST();
+
+    // ── New format: array ──────────────────────────────────────────────────
+    if (Array.isArray(data)) {
+      return data.map((p) => ({
+        id:      p.id      || uid(),
+        label:   p.label   || '',
+        weekday: p.weekday || '',
+        shabbat: p.shabbat || '',
+      }));
+    }
+
+    // ── Legacy format: { weekday: {...}, shabbat: {...} } ──────────────────
+    const OLD_LABELS = {
+      kabbalatShabbat: 'קבלת שבת', shacharit: 'שחרית',
+      minchaGedola: 'מנחה גדולה',  mincha: 'מנחה',
+      maariv: 'ערבית',             motzeiShabbat: 'מוצ"ש',
     };
+    const ORDER = ['kabbalatShabbat','shacharit','minchaGedola','mincha','maariv','motzeiShabbat'];
+    const keys = new Set([...Object.keys(data.weekday || {}), ...Object.keys(data.shabbat || {})]);
+    if (keys.size === 0) return DEFAULT_PRAYER_LIST();
+    return ORDER.filter((k) => keys.has(k)).map((k) => ({
+      id:      uid(),
+      label:   OLD_LABELS[k] || k,
+      weekday: data.weekday?.[k] || '',
+      shabbat: data.shabbat?.[k] || '',
+    }));
   } catch {
-    return {
-      weekday_shacharit:'', weekday_minchaGedola:'', weekday_mincha:'', weekday_maariv:'',
-      shabbat_kabbalatShabbat:'', shabbat_shacharit:'', shabbat_mincha:'', shabbat_motzeiShabbat:'',
-    };
+    return DEFAULT_PRAYER_LIST();
   }
 }
 
-function buildPrayerTimes(p) {
-  const weekday = {};
-  if (p.weekday_shacharit)      weekday.shacharit     = p.weekday_shacharit;
-  if (p.weekday_minchaGedola)   weekday.minchaGedola  = p.weekday_minchaGedola;
-  if (p.weekday_mincha)         weekday.mincha        = p.weekday_mincha;
-  if (p.weekday_maariv)         weekday.maariv        = p.weekday_maariv;
-  const shabbat = {};
-  if (p.shabbat_kabbalatShabbat) shabbat.kabbalatShabbat = p.shabbat_kabbalatShabbat;
-  if (p.shabbat_shacharit)      shabbat.shacharit     = p.shabbat_shacharit;
-  if (p.shabbat_mincha)         shabbat.mincha        = p.shabbat_mincha;
-  if (p.shabbat_motzeiShabbat)  shabbat.motzeiShabbat = p.shabbat_motzeiShabbat;
-  return JSON.stringify({ weekday, shabbat });
+/** Serialise for DB — drop rows with no label */
+function buildPrayerList(prayers) {
+  return JSON.stringify(prayers.filter((p) => p.label.trim()));
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
-
-function TimeRow({ label, value, onChange, optional }) {
-  return (
-    <div>
-      <label className="text-sm text-white/60 mb-1.5 block">
-        {label}
-        {optional && <span className="text-white/25 text-xs ml-2">(optional)</span>}
-      </label>
-      <input
-        type="time"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full input-dark font-mono"
-      />
-    </div>
-  );
-}
+// ── Change-password section ────────────────────────────────────────────────────
 
 function ChangePasswordSection({ synagogueId }) {
   const [newPassword,     setNewPassword]     = useState('');
@@ -69,12 +69,8 @@ function ChangePasswordSection({ synagogueId }) {
 
   const mut = useMutation({
     mutationFn: (password) => api.put(`/synagogues/${synagogueId}`, { password }),
-    onSuccess: () => {
-      toast.success('Password updated');
-      setNewPassword('');
-      setConfirmPassword('');
-    },
-    onError: () => toast.error('Failed to update password'),
+    onSuccess: () => { toast.success('Password updated'); setNewPassword(''); setConfirmPassword(''); },
+    onError:   () => toast.error('Failed to update password'),
   });
 
   function handleSubmit() {
@@ -86,45 +82,28 @@ function ChangePasswordSection({ synagogueId }) {
   return (
     <div className="mt-10 pt-8 border-t border-white/10">
       <h3 className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-4 flex items-center gap-2">
-        <KeyRound className="w-3.5 h-3.5" />
-        Change Password
+        <KeyRound className="w-3.5 h-3.5" /> Change Password
       </h3>
       <div className="grid grid-cols-2 gap-4 max-w-md">
-        <div className="relative">
-          <label className="text-sm text-white/60 mb-1.5 block">New Password</label>
-          <input
-            type={showNew ? 'text' : 'password'}
-            className="w-full input-dark pr-10"
-            placeholder="Min 6 characters"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-          />
-          <button type="button" onClick={() => setShowNew(!showNew)}
-            className="absolute right-3 top-[38px] text-white/30 hover:text-white/60 transition-colors">
-            {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
-        </div>
-        <div className="relative">
-          <label className="text-sm text-white/60 mb-1.5 block">Confirm Password</label>
-          <input
-            type={showConfirm ? 'text' : 'password'}
-            className="w-full input-dark pr-10"
-            placeholder="Repeat password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-          />
-          <button type="button" onClick={() => setShowConfirm(!showConfirm)}
-            className="absolute right-3 top-[38px] text-white/30 hover:text-white/60 transition-colors">
-            {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
-        </div>
+        {[
+          { label: 'New Password',     val: newPassword,     set: setNewPassword,     show: showNew,     toggle: () => setShowNew(!showNew) },
+          { label: 'Confirm Password', val: confirmPassword, set: setConfirmPassword, show: showConfirm, toggle: () => setShowConfirm(!showConfirm) },
+        ].map(({ label, val, set, show, toggle }) => (
+          <div key={label} className="relative">
+            <label className="text-sm text-white/60 mb-1.5 block">{label}</label>
+            <input type={show ? 'text' : 'password'} className="w-full input-dark pr-10"
+              placeholder={label === 'New Password' ? 'Min 6 characters' : 'Repeat password'}
+              value={val} onChange={(e) => set(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()} />
+            <button type="button" onClick={toggle}
+              className="absolute right-3 top-[38px] text-white/30 hover:text-white/60 transition-colors">
+              {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        ))}
       </div>
-      <button
-        onClick={handleSubmit}
-        disabled={mut.isPending || !newPassword || !confirmPassword}
-        className="btn-outline mt-4 flex items-center gap-2 text-sm"
-      >
+      <button onClick={handleSubmit} disabled={mut.isPending || !newPassword || !confirmPassword}
+        className="btn-outline mt-4 flex items-center gap-2 text-sm">
         <KeyRound className="w-4 h-4" />
         {mut.isPending ? 'Updating…' : 'Update Password'}
       </button>
@@ -164,31 +143,25 @@ export default function SynagogueSettingsForm({ synagogue }) {
     hatzalahNumber:       existingEmergency.hatzalah     || '',
   });
 
-  const [prayers, setPrayers] = useState(() => parsePrayerTimes(synagogue.prayerTimes));
+  const [prayers, setPrayers] = useState(() => parsePrayerList(synagogue.prayerTimes));
   const [logoUploading, setLogoUploading] = useState(false);
 
-  // Save general settings
+  // ── Mutations ──────────────────────────────────────────────────────────────
+
   const saveMut = useMutation({
     mutationFn: ({ hatzalahNumber, ...rest }) => {
       const emergencyNumbers = JSON.stringify({ hatzalah: hatzalahNumber || null });
       return api.put(`/synagogues/${synagogue.id}`, { ...rest, emergencyNumbers });
     },
-    onSuccess: () => {
-      toast.success('Settings saved');
-      qc.invalidateQueries(['synagogue', synagogue.id]);
-    },
-    onError: () => toast.error('Failed to save'),
+    onSuccess: () => { toast.success('Settings saved'); qc.invalidateQueries(['synagogue', synagogue.id]); },
+    onError:   () => toast.error('Failed to save'),
   });
 
-  // Save prayer times
   const prayerMut = useMutation({
     mutationFn: () =>
-      api.put(`/synagogues/${synagogue.id}`, { prayerTimes: buildPrayerTimes(prayers) }),
-    onSuccess: () => {
-      toast.success('Prayer times saved');
-      qc.invalidateQueries(['synagogue', synagogue.id]);
-    },
-    onError: () => toast.error('Failed to save prayer times'),
+      api.put(`/synagogues/${synagogue.id}`, { prayerTimes: buildPrayerList(prayers) }),
+    onSuccess: () => { toast.success('Prayer times saved'); qc.invalidateQueries(['synagogue', synagogue.id]); },
+    onError:   () => toast.error('Failed to save prayer times'),
   });
 
   async function handleLogoUpload(e) {
@@ -198,42 +171,46 @@ export default function SynagogueSettingsForm({ synagogue }) {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const { data } = await api.post('/upload/logo', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const { data } = await api.post('/upload/logo', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       await api.put(`/synagogues/${synagogue.id}`, { logoUrl: data.url });
       toast.success('Logo updated');
       qc.invalidateQueries(['synagogue', synagogue.id]);
-    } catch {
-      toast.error('Logo upload failed');
-    } finally {
-      setLogoUploading(false);
-    }
+    } catch { toast.error('Logo upload failed'); }
+    finally { setLogoUploading(false); }
   }
+
+  // ── Prayer list helpers ────────────────────────────────────────────────────
+
+  function addPrayer() {
+    setPrayers((prev) => [...prev, { id: uid(), label: '', weekday: '', shabbat: '' }]);
+  }
+  function removePrayer(id) {
+    setPrayers((prev) => prev.filter((p) => p.id !== id));
+  }
+  function updatePrayer(id, field, value) {
+    setPrayers((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="max-w-2xl">
 
-      {/* ── Tab switcher ── */}
+      {/* Tab switcher */}
       <div className="flex gap-1 mb-7 bg-ink-800 rounded-xl p-1">
         {SETTINGS_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setSettingsTab(tab.id)}
+          <button key={tab.id} onClick={() => setSettingsTab(tab.id)}
             className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
-              settingsTab === tab.id
-                ? 'bg-gold-400 text-ink-900'
-                : 'text-white/50 hover:text-white/80'
-            }`}
-          >
+              settingsTab === tab.id ? 'bg-gold-400 text-ink-900' : 'text-white/50 hover:text-white/80'
+            }`}>
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* ══════════════════════════════════════════════════
+      {/* ═══════════════════════════════════════
           TAB: General
-      ══════════════════════════════════════════════════ */}
+      ═══════════════════════════════════════ */}
       {settingsTab === 'general' && (
         <>
           {/* Logo */}
@@ -290,51 +267,35 @@ export default function SynagogueSettingsForm({ synagogue }) {
               </select>
             </div>
 
-            {/* Kiosk PIN */}
             <div className="col-span-2">
               <label className="text-sm text-white/60 mb-1.5 flex items-center gap-2">
-                <Lock className="w-3.5 h-3.5 text-gold-400/60" />
-                Kiosk Exit PIN (4 digits)
+                <Lock className="w-3.5 h-3.5 text-gold-400/60" /> Kiosk Exit PIN (4 digits)
               </label>
-              <input
-                type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+              <input type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
                 placeholder="e.g. 1234 — leave empty to disable PIN lock"
                 className="w-full input-dark font-mono tracking-widest"
                 value={form.kioskPin}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/\D/g, '').slice(0, 4);
-                  setForm({ ...form, kioskPin: v });
-                }}
-              />
-              <p className="text-white/25 text-xs mt-1">
-                Tablet users must enter this PIN to exit fullscreen kiosk mode. Leave empty to allow free exit.
-              </p>
+                onChange={(e) => setForm({ ...form, kioskPin: e.target.value.replace(/\D/g, '').slice(0, 4) })} />
+              <p className="text-white/25 text-xs mt-1">Leave empty to allow free exit.</p>
             </div>
 
-            {/* Hatzalah */}
             <div className="col-span-2">
               <label className="text-sm text-white/60 mb-1.5 flex items-center gap-2">
-                <Phone className="w-3.5 h-3.5 text-red-400/70" />
-                Hatzalah / Emergency Number (shown on Shabbat screen)
+                <Phone className="w-3.5 h-3.5 text-red-400/70" /> Hatzalah / Emergency Number
               </label>
-              <input
-                type="tel" placeholder="e.g. 514-738-3311 — leave empty to hide"
+              <input type="tel" placeholder="e.g. 514-738-3311 — leave empty to hide"
                 className="w-full input-dark font-mono"
                 value={form.hatzalahNumber}
-                onChange={(e) => setForm({ ...form, hatzalahNumber: e.target.value })}
-              />
-              <p className="text-white/25 text-xs mt-1">
-                Appears as a second emergency button next to 911 during Shabbat mode.
-              </p>
+                onChange={(e) => setForm({ ...form, hatzalahNumber: e.target.value })} />
+              <p className="text-white/25 text-xs mt-1">Appears next to 911 during Shabbat mode.</p>
             </div>
 
-            {/* Theme */}
             <div className="col-span-2">
               <label className="text-sm text-white/60 mb-2 block">Kiosk Theme</label>
               <div className="flex gap-3">
                 {['dark', 'light'].map((t) => (
                   <button key={t} onClick={() => setForm({ ...form, theme: t })}
-                    className={`flex-1 py-3 rounded-xl capitalize font-medium text-sm transition-all ${
+                    className={`flex-1 py-3 rounded-xl font-medium text-sm transition-all ${
                       form.theme === t ? 'bg-gold-400 text-ink-900' : 'bg-white/5 text-white/50 hover:bg-white/10'
                     }`}>
                     {t === 'dark' ? '🌙 Dark' : '☀️ Light'}
@@ -352,107 +313,108 @@ export default function SynagogueSettingsForm({ synagogue }) {
             </button>
             <a href={`/kiosk/${synagogue.id}?preview_shabbat=1`} target="_blank" rel="noopener noreferrer"
               className="btn-outline flex items-center gap-2 text-sm">
-              <Moon className="w-4 h-4 text-gold-400" />
-              Preview Shabbat Mode
+              <Moon className="w-4 h-4 text-gold-400" /> Preview Shabbat Mode
             </a>
           </div>
 
           <ChangePasswordSection synagogueId={synagogue.id} />
 
           <div className="mt-10 pt-8 border-t border-white/10">
-            <h3 className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-4">
-              Payment Account
-            </h3>
+            <h3 className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-4">Payment Account</h3>
             <StripeConnectCard synagogueId={synagogue.id} synagogueName={synagogue.synagogueName} />
           </div>
         </>
       )}
 
-      {/* ══════════════════════════════════════════════════
+      {/* ═══════════════════════════════════════
           TAB: Prayer Times
-      ══════════════════════════════════════════════════ */}
+      ═══════════════════════════════════════ */}
       {settingsTab === 'prayers' && (
         <div>
-          <p className="text-white/40 text-sm mb-6">
-            Empty fields will not be displayed in the kiosk. Times use 24-hour format.
+          <p className="text-white/35 text-sm mb-5 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-gold-400/50 shrink-0" />
+            רק תפילות עם שעה מוגדרת יוצגו בקיוסק. שדה ריק = לא מוצג.
           </p>
 
-          <div className="grid grid-cols-2 gap-8">
-
-            {/* ── Weekday column ── */}
-            <div>
-              <h3 className="text-gold-400 text-xs font-semibold uppercase tracking-widest mb-5 flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5" />
-                חול / Weekday
-              </h3>
-              <div className="space-y-4">
-                <TimeRow
-                  label="שחרית / Shacharit"
-                  value={prayers.weekday_shacharit}
-                  onChange={(v) => setPrayers({ ...prayers, weekday_shacharit: v })}
-                />
-                <TimeRow
-                  label="מנחה גדולה / Mincha Gedola"
-                  value={prayers.weekday_minchaGedola}
-                  onChange={(v) => setPrayers({ ...prayers, weekday_minchaGedola: v })}
-                  optional
-                />
-                <TimeRow
-                  label="מנחה / Mincha"
-                  value={prayers.weekday_mincha}
-                  onChange={(v) => setPrayers({ ...prayers, weekday_mincha: v })}
-                />
-                <TimeRow
-                  label="ערבית / Maariv"
-                  value={prayers.weekday_maariv}
-                  onChange={(v) => setPrayers({ ...prayers, weekday_maariv: v })}
-                />
-              </div>
-            </div>
-
-            {/* ── Shabbat column ── */}
-            <div>
-              <h3 className="text-gold-400 text-xs font-semibold uppercase tracking-widest mb-5 flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5" />
-                שבת / Shabbat
-              </h3>
-              <div className="space-y-4">
-                <TimeRow
-                  label="קבלת שבת / Kabbalat Shabbat"
-                  value={prayers.shabbat_kabbalatShabbat}
-                  onChange={(v) => setPrayers({ ...prayers, shabbat_kabbalatShabbat: v })}
-                  optional
-                />
-                <TimeRow
-                  label="שחרית / Shacharit"
-                  value={prayers.shabbat_shacharit}
-                  onChange={(v) => setPrayers({ ...prayers, shabbat_shacharit: v })}
-                />
-                <TimeRow
-                  label="מנחה / Mincha"
-                  value={prayers.shabbat_mincha}
-                  onChange={(v) => setPrayers({ ...prayers, shabbat_mincha: v })}
-                />
-                <TimeRow
-                  label='מוצ"ש / Motzei Shabbat'
-                  value={prayers.shabbat_motzeiShabbat}
-                  onChange={(v) => setPrayers({ ...prayers, shabbat_motzeiShabbat: v })}
-                />
-              </div>
-            </div>
+          {/* Column headers */}
+          <div className="grid grid-cols-[1fr_120px_120px_36px] gap-3 mb-2 px-1">
+            <span className="text-xs text-white/30 uppercase tracking-widest">תפילה</span>
+            <span className="text-xs text-white/30 uppercase tracking-widest text-center">חול</span>
+            <span className="text-xs text-white/30 uppercase tracking-widest text-center">שבת</span>
+            <span />
           </div>
 
+          {/* Prayer rows */}
+          <div className="space-y-2">
+            {prayers.map((prayer) => (
+              <div key={prayer.id}
+                className="grid grid-cols-[1fr_120px_120px_36px] gap-3 items-center
+                           bg-ink-800/50 rounded-xl px-3 py-2 border border-white/5
+                           hover:border-white/10 transition-colors">
+
+                {/* Editable name */}
+                <input
+                  type="text"
+                  placeholder="שם התפילה..."
+                  dir="auto"
+                  className="bg-transparent text-white/80 text-sm placeholder:text-white/20
+                             outline-none border-b border-transparent focus:border-gold-400/40
+                             transition-colors pb-0.5 w-full"
+                  value={prayer.label}
+                  onChange={(e) => updatePrayer(prayer.id, 'label', e.target.value)}
+                />
+
+                {/* Weekday time */}
+                <input
+                  type="time"
+                  className="input-dark font-mono text-sm text-center py-1.5"
+                  value={prayer.weekday}
+                  onChange={(e) => updatePrayer(prayer.id, 'weekday', e.target.value)}
+                />
+
+                {/* Shabbat time */}
+                <input
+                  type="time"
+                  className="input-dark font-mono text-sm text-center py-1.5"
+                  value={prayer.shabbat}
+                  onChange={(e) => updatePrayer(prayer.id, 'shabbat', e.target.value)}
+                />
+
+                {/* Delete */}
+                <button
+                  onClick={() => removePrayer(prayer.id)}
+                  className="text-white/15 hover:text-red-400 transition-colors p-1 rounded-lg
+                             hover:bg-red-900/20 flex items-center justify-center"
+                  title="הסר תפילה"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Add prayer */}
+          <button
+            onClick={addPrayer}
+            className="mt-4 flex items-center gap-2 text-sm text-white/40 hover:text-gold-400
+                       transition-colors px-3 py-2 rounded-xl hover:bg-white/5 border border-dashed
+                       border-white/10 hover:border-gold-400/30 w-full justify-center"
+          >
+            <Plus className="w-4 h-4" />
+            הוסף תפילה
+          </button>
+
+          {/* Save */}
           <button
             onClick={() => prayerMut.mutate()}
             disabled={prayerMut.isPending}
-            className="btn-gold flex items-center gap-2 mt-8"
+            className="btn-gold flex items-center gap-2 mt-6"
           >
             <Save className="w-4 h-4" />
             {prayerMut.isPending ? 'Saving…' : 'Save Prayer Times'}
           </button>
         </div>
       )}
-
     </div>
   );
 }
