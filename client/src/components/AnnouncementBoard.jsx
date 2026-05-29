@@ -37,6 +37,19 @@ const TRANSLATIONS = {
   },
 };
 
+// ── Prayer name translations ───────────────────────────────────────────────────
+const PRAYER_NAMES = {
+  kabbalatShabbat: { en: 'Kabbalat Shabbat', he: 'קבלת שבת',    fr: 'Kabbala Chabbat',       yi: 'קבלת שבת'    },
+  shacharit:       { en: 'Shacharit',         he: 'שחרית',       fr: 'Chacharit',             yi: 'שחרית'       },
+  minchaGedola:    { en: 'Mincha Gedola',     he: 'מנחה גדולה',  fr: 'Minha Gedola',          yi: 'מנחה גדולה'  },
+  mincha:          { en: 'Mincha',            he: 'מנחה',        fr: 'Minha',                 yi: 'מנחה'        },
+  maariv:          { en: 'Maariv',            he: 'ערבית',       fr: 'Arvit',                 yi: 'מעריב'       },
+  motzeiShabbat:   { en: 'Motzei Shabbat',    he: 'מוצ"ש',       fr: "Motsa'é Chabbat",       yi: 'מוצ"ש'       },
+};
+
+// Canonical display order for prayer entries
+const PRAYER_ORDER = ['kabbalatShabbat', 'shacharit', 'minchaGedola', 'mincha', 'maariv', 'motzeiShabbat'];
+
 function to24h(timeStr) {
   if (!timeStr || typeof timeStr !== 'string') return timeStr;
   if (!/[AaPp][Mm]/.test(timeStr)) return timeStr; // already 24-h or no period
@@ -125,24 +138,38 @@ export default function AnnouncementBoard({ synagogue, lang = 'en' }) {
         </div>
       )}
 
-      {/* Prayer Times */}
-      {prayers && (
-        <div className={`${card} p-4 shrink-0`}>
-          <div className="flex items-center gap-2 mb-2">
-            <Clock className="w-4 h-4 text-gold-400" />
-            <span className="text-gold-400 text-sm font-semibold tracking-wide uppercase">{t.prayerTimes}</span>
-            <span className={`${textMuted} text-xs ml-auto`}>{isWeekend ? t.shabbat : t.today}</span>
+      {/* Prayer Times — ordered, translated, empty-filtered */}
+      {(() => {
+        if (!prayerTimes) return null;
+        const prayersObj = isWeekend ? prayerTimes.shabbat : prayerTimes.weekday;
+        if (!prayersObj) return null;
+        // Keep canonical order; skip empty / null / whitespace-only values
+        const entries = PRAYER_ORDER
+          .filter((key) => prayersObj[key] && String(prayersObj[key]).trim())
+          .map((key) => ({
+            key,
+            label: (PRAYER_NAMES[key] || {})[lang] || key,
+            time:  to24h(prayersObj[key]),
+          }));
+        if (entries.length === 0) return null;
+        return (
+          <div className={`${card} p-4 shrink-0`}>
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="w-4 h-4 text-gold-400" />
+              <span className="text-gold-400 text-sm font-semibold tracking-wide uppercase">{t.prayerTimes}</span>
+              <span className={`${textMuted} text-xs ml-auto`}>{isWeekend ? t.shabbat : t.today}</span>
+            </div>
+            <div className="space-y-1.5">
+              {entries.map(({ key, label, time }) => (
+                <div key={key} className="flex justify-between items-center text-sm">
+                  <span className={textMuted}>{label}</span>
+                  <span className={`${textStrong} font-medium`}>{time}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="space-y-1.5">
-            {Object.entries(prayers).map(([prayer, pTime]) => (
-              <div key={prayer} className="flex justify-between items-center text-sm">
-                <span className={`${textMuted} capitalize`}>{prayer}</span>
-                <span className={`${textStrong} font-medium`}>{to24h(pTime)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Halachic Zmanim */}
       {zmanim && (
