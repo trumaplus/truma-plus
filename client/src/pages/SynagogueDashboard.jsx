@@ -174,7 +174,7 @@ export default function SynagogueDashboard() {
           <div className="fade-in">
             <h2 className="font-display text-3xl text-white mb-8">Settings</h2>
             <div className="card-dark p-6">
-              <SynagogueSettingsForm synagogue={synagogue} />
+              <SynagogueSettingsForm key={synagogue.id} synagogue={synagogue} />
             </div>
           </div>
         )}
