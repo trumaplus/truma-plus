@@ -17,9 +17,17 @@ export default function Login() {
   const [showPinModal, setShowPinModal] = useState(false);
   const navigate = useNavigate();
 
-  // Already logged in → go straight to the right dashboard
+  // Already logged in → go straight to the right dashboard.
+  // Role is read from the JWT payload — NOT from localStorage (which can be tampered).
   const existingToken = localStorage.getItem('dp_token');
-  const existingRole  = localStorage.getItem('dp_role');
+  const existingPayload = (() => {
+    try {
+      const b64 = existingToken?.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(b64));
+    } catch { return null; }
+  })();
+  const existingRole = (existingPayload && !(existingPayload.exp && existingPayload.exp * 1000 < Date.now()))
+    ? existingPayload.role : null;
   if (existingToken && existingRole === 'synagogue') return <Navigate to="/dashboard" replace />;
   if (existingToken && existingRole === 'admin')     return <Navigate to="/admin"     replace />;
 

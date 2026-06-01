@@ -20,12 +20,17 @@ export default function KioskControl({ synagogueId, synagogueName, isAdmin = fal
     socket.on('connect', () => {
       setConnected(true);
       if (isAdmin) {
+        // Admin: join admin room to see ALL kiosks
         socket.emit('admin:join', { token });
+      } else if (synagogueId) {
+        // Gabai: join their own scoped room to see only their kiosk
+        socket.emit('gabai:join', { token });
       }
     });
 
     socket.on('disconnect', () => setConnected(false));
 
+    // ── Admin events ──────────────────────────────────────────────────────────
     socket.on('admin:joined', ({ kiosks: list }) => setKiosks(list));
     socket.on('kiosk:connected', (data) => {
       setKiosks((prev) => {
@@ -40,6 +45,16 @@ export default function KioskControl({ synagogueId, synagogueName, isAdmin = fal
     });
     socket.on('kiosk:status-update', (data) => {
       setKiosks((prev) => prev.map((k) => k.synagogueId === data.synagogueId ? { ...k, ...data } : k));
+    });
+
+    // ── Gabai events (own kiosk only) ─────────────────────────────────────────
+    socket.on('gabai:joined', ({ kiosk }) => {
+      // Initial status on connect — null means kiosk is offline
+      setKiosks(kiosk ? [{ ...kiosk, connected: true }] : []);
+    });
+    socket.on('gabai:kiosk-status', (data) => {
+      setKiosks(data.connected ? [data] : []);
+      if (data.connected) toast.success('Kiosk connected');
     });
 
     return () => socket.disconnect();

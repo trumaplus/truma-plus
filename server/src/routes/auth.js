@@ -2,7 +2,7 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireAdmin } = require('../middleware/auth');
 
 const prisma = new PrismaClient();
 
@@ -48,8 +48,8 @@ router.post('/synagogue/login', async (req, res) => {
   }
 });
 
-// POST /api/auth/synagogue/register (Admin only)
-router.post('/synagogue/register', async (req, res) => {
+// POST /api/auth/synagogue/register (Admin only — enforced)
+router.post('/synagogue/register', requireAdmin, async (req, res) => {
   try {
     const { synagogueName, email, password, city, synagogueCode } = req.body;
     if (!synagogueName || !email || !password) {
