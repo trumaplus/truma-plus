@@ -66,7 +66,12 @@ router.post('/connect/:synagogueId', requireAdminOrSynagogue, async (req, res) =
       });
     }
 
-    const result = await createConnectAccountLink(synagogue);
+    // Return to the correct dashboard page after Stripe onboarding completes
+    const returnPath = req.user.role === 'admin'
+      ? `/admin/synagogue/${synagogueId}`
+      : '/dashboard';
+
+    const result = await createConnectAccountLink(synagogue, returnPath);
     res.json(result);
   } catch (err) {
     console.error('[Connect] createConnectAccountLink error:', err.message);

@@ -1,100 +1,106 @@
-import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   CreditCard, ExternalLink, CheckCircle2, Clock, AlertTriangle,
-  Loader2, RefreshCw, Copy, Check,
+  Loader2, RefreshCw,
 } from 'lucide-react';
 import api from '../../api/client';
 
+// ── Status display config ─────────────────────────────────────────────────────
 const STATUS_CONFIG = {
   not_connected: {
-    label:  'Not Connected',
+    label:  'לא מחובר',
     icon:   AlertTriangle,
     color:  'text-red-400',
     bg:     'bg-red-950/40 border-red-500/20',
     dot:    'bg-red-500',
+    desc:   'חבר חשבון בנק כדי לקבל תרומות ישירות לחשבון. תהליך הגדרה של כ-5 דקות.',
+    btn:    'חבר חשבון Stripe',
+    btnCls: 'bg-gold-400/15 text-gold-400 hover:bg-gold-400/25',
   },
   pending: {
-    label:  'Pending Setup',
+    label:  'ממתין להשלמה',
     icon:   Clock,
     color:  'text-amber-400',
     bg:     'bg-amber-950/40 border-amber-500/20',
     dot:    'bg-amber-400',
+    desc:   'כמעט שם — השלם את תהליך ההגדרה ב-Stripe כדי להתחיל לקבל תרומות.',
+    btn:    'המשך הגדרה',
+    btnCls: 'bg-amber-400/15 text-amber-400 hover:bg-amber-400/25',
   },
   restricted: {
-    label:  'Restricted',
+    label:  'מוגבל',
     icon:   AlertTriangle,
     color:  'text-orange-400',
     bg:     'bg-orange-950/40 border-orange-500/20',
     dot:    'bg-orange-400',
+    desc:   'לחשבון יש הגבלות. לחץ "המשך הגדרה" כדי להשלים את הדרישות הפתוחות.',
+    btn:    'המשך הגדרה',
+    btnCls: 'bg-orange-400/15 text-orange-400 hover:bg-orange-400/25',
   },
   active: {
-    label:  'Active',
+    label:  'מחובר ופעיל',
     icon:   CheckCircle2,
     color:  'text-emerald-400',
     bg:     'bg-emerald-950/40 border-emerald-500/20',
     dot:    'bg-emerald-400',
+    desc:   'תרומות מועברות ישירות לחשבון הבנק שלך. נהל משיכות ב-Stripe Dashboard.',
+    btn:    'נהל חשבון Stripe',
+    btnCls: 'bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60',
   },
 };
 
 export default function StripeConnectCard({ synagogueId, synagogueName }) {
-  const [copied, setCopied] = useState(false);
-  const [pendingUrl, setPendingUrl] = useState(null);
+  const qc = useQueryClient();
 
   const { data: status, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['stripe-connect-status', synagogueId],
     queryFn:  () => api.get(`/stripe/connect/${synagogueId}/status`).then((r) => r.data),
+    // Refetch when user returns to this tab (e.g. after Stripe onboarding)
     refetchOnWindowFocus: true,
   });
 
+  // ── Connect / refresh onboarding link ────────────────────────────────────────
   const connectMut = useMutation({
     mutationFn: () => api.post(`/stripe/connect/${synagogueId}`),
     onSuccess: ({ data }) => {
       if (data.url) {
-        setPendingUrl(data.url);
-        window.open(data.url, '_blank', 'noopener,noreferrer');
+        // Navigate in the same tab — Stripe will redirect back with ?stripe_return=1
+        window.location.href = data.url;
       }
     },
     onError: (err) => {
-      const msg = err.response?.data?.error || 'Failed to create Connect link';
       if (err.response?.data?.configMissing) {
-        toast.error('Stripe not configured — set STRIPE_SECRET_KEY in Railway env vars');
+        toast.error('Stripe לא מוגדר — הגדר STRIPE_SECRET_KEY ב-Railway');
       } else {
-        toast.error(msg);
+        toast.error(err.response?.data?.error || 'שגיאה ביצירת קישור Stripe');
       }
     },
   });
 
+  // ── Dashboard login link (active accounts only) ───────────────────────────────
   const loginMut = useMutation({
     mutationFn: () => api.get(`/stripe/connect/${synagogueId}/login`),
     onSuccess: ({ data }) => {
       if (data.url) window.open(data.url, '_blank', 'noopener,noreferrer');
     },
-    onError: (err) => toast.error(err.response?.data?.error || 'Failed to get login link'),
+    onError: (err) => toast.error(err.response?.data?.error || 'שגיאה בפתיחת Stripe Dashboard'),
   });
 
-  async function handleCopy() {
-    if (!pendingUrl) return;
-    await navigator.clipboard.writeText(pendingUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    toast.success('Link copied to clipboard');
-  }
-
+  // ── Loading skeleton ──────────────────────────────────────────────────────────
   if (isLoading) {
-    return (
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4 animate-pulse h-24" />
-    );
+    return <div className="rounded-xl border border-white/10 bg-white/5 p-4 animate-pulse h-24" />;
   }
 
   const accountStatus = status?.status || 'not_connected';
-  const cfg = STATUS_CONFIG[accountStatus] || STATUS_CONFIG.not_connected;
+  const cfg  = STATUS_CONFIG[accountStatus] || STATUS_CONFIG.not_connected;
   const Icon = cfg.icon;
+  const isActive = accountStatus === 'active';
 
   return (
     <div className={`rounded-xl border p-5 ${cfg.bg}`}>
-      {/* Header row */}
+
+      {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
@@ -104,93 +110,62 @@ export default function StripeConnectCard({ synagogueId, synagogueName }) {
             <p className="text-white/80 text-sm font-semibold">Stripe Connect</p>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
-              <span className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</span>
+              <span className={`text-xs font-semibold ${cfg.color}`}>{cfg.label}</span>
               {status?.mock && (
-                <span className="text-white/25 text-xs">(Stripe not configured)</span>
+                <span className="text-white/25 text-xs">(Stripe לא מוגדר)</span>
               )}
             </div>
           </div>
         </div>
 
-        {/* Actions */}
+        {/* ── Action buttons ── */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Refresh button */}
+          {/* Refresh status */}
           <button
             onClick={() => refetch()}
             disabled={isRefetching}
-            title="Refresh status"
+            title="רענן סטטוס"
             className="p-1.5 rounded-lg text-white/25 hover:text-white/60 hover:bg-white/10 transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefetching ? 'animate-spin' : ''}`} />
           </button>
 
-          {accountStatus === 'active' ? (
+          {/* Main action */}
+          {isActive ? (
             <button
               onClick={() => loginMut.mutate()}
               disabled={loginMut.isPending}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                         bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60
-                         text-xs font-medium transition-colors"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${cfg.btnCls}`}
             >
               {loginMut.isPending
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 : <ExternalLink className="w-3.5 h-3.5" />}
-              Manage Account
+              {cfg.btn}
             </button>
           ) : (
             <button
               onClick={() => connectMut.mutate()}
               disabled={connectMut.isPending || !!status?.mock}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                         bg-gold-400/15 text-gold-400 hover:bg-gold-400/25
-                         disabled:opacity-40 disabled:cursor-not-allowed
-                         text-xs font-medium transition-colors"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
+                          disabled:opacity-40 disabled:cursor-not-allowed ${cfg.btnCls}`}
             >
               {connectMut.isPending
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 : <CreditCard className="w-3.5 h-3.5" />}
-              {accountStatus === 'pending' ? 'Continue Setup' : 'Connect Stripe'}
+              {connectMut.isPending ? 'מעביר לـ Stripe…' : cfg.btn}
             </button>
           )}
         </div>
       </div>
 
-      {/* Description */}
-      <p className={`text-xs mt-3 ${cfg.color} opacity-70`}>
-        {accountStatus === 'active' &&
-          'Donations go directly to your bank account. Payouts managed via Stripe Dashboard.'}
-        {accountStatus === 'pending' &&
-          'Almost there — complete Stripe onboarding to start receiving donations directly.'}
-        {accountStatus === 'restricted' &&
-          'Your account has restrictions. Click "Continue Setup" to resolve outstanding requirements.'}
-        {accountStatus === 'not_connected' &&
-          'Connect a bank account to receive donations directly. Takes ~5 minutes to set up.'}
+      {/* ── Description ── */}
+      <p className={`text-xs mt-3 leading-relaxed ${cfg.color} opacity-70`}>
+        {cfg.desc}
       </p>
 
-      {/* Copy link panel (shown after link is generated) */}
-      {pendingUrl && accountStatus !== 'active' && (
-        <div className="mt-3 flex items-center gap-2 bg-black/20 rounded-lg p-2 fade-in">
-          <input
-            readOnly
-            value={pendingUrl}
-            className="flex-1 text-xs text-white/40 bg-transparent outline-none truncate"
-          />
-          <button
-            onClick={handleCopy}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-white/60
-                       hover:text-white/90 hover:bg-white/10 transition-colors shrink-0"
-          >
-            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-            {copied ? 'Copied' : 'Copy'}
-          </button>
-        </div>
-      )}
-
-      {/* Account ID (for admins to see) */}
+      {/* ── Account ID (dev/admin info) ── */}
       {status?.accountId && (
-        <p className="text-white/15 text-xs mt-2 font-mono">
-          {status.accountId}
-        </p>
+        <p className="text-white/15 text-xs mt-2 font-mono">{status.accountId}</p>
       )}
     </div>
   );

@@ -227,8 +227,12 @@ async function handleWebhookEvent(rawBody, signature) {
  * Creates a Stripe Express Connect account (if none exists) and returns an
  * onboarding AccountLink URL. Safe to call multiple times — if the account
  * already exists it just refreshes the link.
+ *
+ * @param {object} synagogue  - Prisma synagogue record
+ * @param {string} returnPath - URL path to return to after onboarding (e.g. '/dashboard'
+ *                              or '/admin/synagogue/:id'). Defaults to '/dashboard'.
  */
-async function createConnectAccountLink(synagogue) {
+async function createConnectAccountLink(synagogue, returnPath = '/dashboard') {
   const stripe    = getStripe();
   const clientUrl = getClientUrl();
 
@@ -260,11 +264,13 @@ async function createConnectAccountLink(synagogue) {
     console.log(`[Connect] Created Stripe Express account ${accountId} for ${synagogue.synagogueName}`);
   }
 
-  // Create (or refresh) the onboarding link
+  // Create (or refresh) the onboarding link.
+  // stripe_return=1  → onboarding completed
+  // stripe_refresh=1 → link expired, user needs to restart
   const accountLink = await stripe.accountLinks.create({
     account:     accountId,
-    refresh_url: `${clientUrl}/dashboard`,
-    return_url:  `${clientUrl}/dashboard`,
+    refresh_url: `${clientUrl}${returnPath}?stripe_refresh=1`,
+    return_url:  `${clientUrl}${returnPath}?stripe_return=1`,
     type:        'account_onboarding',
   });
 

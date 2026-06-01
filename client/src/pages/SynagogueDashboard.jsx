@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LogOut, LayoutDashboard, DollarSign, Image, Bell, Settings, Tablet, ExternalLink } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '../api/client';
 import DonationsTable from '../components/admin/DonationsTable';
 import MediaManager from '../components/admin/MediaManager';
@@ -31,7 +32,21 @@ function getSynagogueIdFromToken() {
 export default function SynagogueDashboard() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState('overview');
+
+  // Detect return from Stripe Connect onboarding → jump to Settings tab
+  useEffect(() => {
+    const isReturn  = searchParams.get('stripe_return')  === '1';
+    const isRefresh = searchParams.get('stripe_refresh') === '1';
+    if (isReturn || isRefresh) {
+      setTab('settings');
+      if (isReturn)  toast.success('חזרת מ-Stripe — בדוק את סטטוס החיבור');
+      if (isRefresh) toast.info('הקישור של Stripe פג תוקף — לחץ "המשך הגדרה" מחדש');
+      setSearchParams({}, { replace: true }); // remove query params from URL
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // synagogueId is sourced from the JWT — tamper-proof on the client, enforced on the server
   const synagogueId = getSynagogueIdFromToken();
   // Name is display-only; read from localStorage (falls back to server data once loaded)
