@@ -78,6 +78,8 @@ router.get('/', requireAdmin, async (req, res) => {
   }
 });
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
  * POST /api/synagogues
  * Creates a synagogue — admin only.
@@ -85,20 +87,37 @@ router.get('/', requireAdmin, async (req, res) => {
 router.post('/', requireAdmin, async (req, res) => {
   try {
     const { synagogueName, email, password, city, synagogueCode, latitude, longitude, candleLightingOffset } = req.body;
-    if (!synagogueName || !email || !password) {
-      return res.status(400).json({ error: 'synagogueName, email, and password required' });
+
+    // ── Field validation ───────────────────────────────────────────────────────
+    if (!synagogueName?.trim()) {
+      return res.status(400).json({ field: 'synagogueName', error: 'שם בית הכנסת חובה' });
     }
+    if (!email?.trim()) {
+      return res.status(400).json({ field: 'email', error: 'אימייל חובה' });
+    }
+    if (!EMAIL_RE.test(email.trim())) {
+      return res.status(400).json({ field: 'email', error: 'פורמט אימייל לא תקין' });
+    }
+    if (!password) {
+      return res.status(400).json({ field: 'password', error: 'סיסמה חובה' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ field: 'password', error: 'סיסמה חייבת להכיל לפחות 6 תווים' });
+    }
+
     const code = synagogueCode ||
-      synagogueName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') +
+      synagogueName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') +
       '-' + Date.now().toString(36);
     const passwordHash = await bcrypt.hash(password, 10);
     const synagogue = await prisma.synagogue.create({
-      data: { synagogueName, synagogueCode: code, email, passwordHash, city, latitude, longitude, candleLightingOffset },
+      data: { synagogueName: synagogueName.trim(), synagogueCode: code, email: email.trim().toLowerCase(), passwordHash, city, latitude, longitude, candleLightingOffset },
     });
     const { passwordHash: _, ...safe } = synagogue;
     res.status(201).json(safe);
   } catch (err) {
-    if (err.code === 'P2002') return res.status(409).json({ error: 'Email or code already exists' });
+    if (err.code === 'P2002') {
+      return res.status(409).json({ field: 'email', error: 'אימייל זה כבר רשום במערכת' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
