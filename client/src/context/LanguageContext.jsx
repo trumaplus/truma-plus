@@ -1,10 +1,10 @@
 import { createContext, useContext, useState } from 'react';
 
 export const LANGS = [
-  { code: 'en', label: 'EN', name: 'English' },
-  { code: 'he', label: 'עב', name: 'עברית' },
-  { code: 'fr', label: 'FR', name: 'Français' },
-  { code: 'yi', label: 'יי', name: 'ייִדיש' },
+  { code: 'en', label: 'EN', name: 'English',  flag: '🇬🇧' },
+  { code: 'fr', label: 'FR', name: 'Français', flag: '🇫🇷' },
+  { code: 'he', label: 'עב', name: 'עברית',    flag: '🇮🇱' },
+  { code: 'yi', label: 'יי', name: 'ייִדיש',  flag: '🇾🇪' },
 ];
 
 const LanguageContext = createContext(null);

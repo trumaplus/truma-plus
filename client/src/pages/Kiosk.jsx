@@ -303,19 +303,17 @@ export default function Kiosk() {
             <LanguageSwitcher isDark={isDark} />
             <KioskModeButton isDark={isDark} kioskPin={synagogue.kioskPin || ''} />
 
-            {/* ⚙ Gabai — 3-second long press only */}
+            {/* ⚙ Icon-only — 3-second long press for Gabai access */}
             <div className="relative">
               <button
                 {...gearHandlers}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium
-                            transition-all select-none
+                className={`p-2 rounded-xl transition-all select-none
                             ${isDark
-                              ? 'text-white/30 hover:text-gold-400 hover:bg-white/8 border border-white/10 hover:border-gold-400/30'
-                              : 'text-gray-400 hover:text-ink-900 hover:bg-gray-100 border border-gray-200'}`}
+                              ? 'text-white/20 hover:text-white/45 hover:bg-white/8 border border-white/8'
+                              : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100 border border-gray-200'}`}
                 title="Hold 3 seconds for Gabai access"
               >
-                <Settings className="w-3.5 h-3.5" />
-                <span>Gabai</span>
+                <Settings className="w-4 h-4" />
               </button>
             </div>
           </div>
