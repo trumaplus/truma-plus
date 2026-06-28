@@ -1,0 +1,29 @@
+{
+  "name": "truma-plus-kiosk",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "build:ios": "eas build --platform ios --profile production",
+    "build:android": "eas build --platform android --profile production"
+  },
+  "dependencies": {
+    "expo": "~51.0.28",
+    "expo-status-bar": "~1.12.1",
+    "expo-dev-client": "~4.0.27",
+    "expo-build-properties": "~0.12.5",
+    "react": "18.2.0",
+    "react-native": "0.74.5",
+    "@stripe/stripe-terminal-react-native": "^1.5.4",
+    "axios": "^1.7.0",
+    "@react-native-async-storage/async-storage": "1.23.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@types/react": "~18.2.45",
+    "@types/react-native": "~0.73.0",
+    "typescript": "^5.3.0"
+  }
+}

@@ -14,7 +14,8 @@ const donationRoutes = require('./routes/donations');
 const stripeRoutes = require('./routes/stripe');
 const mediaRoutes = require('./routes/media');
 const uploadRoutes = require('./routes/upload');
-const kioskRoutes = require('./routes/kiosks');
+const kioskRoutes    = require('./routes/kiosks');
+const terminalRoutes = require('./routes/terminal');
 
 const app = express();
 const server = http.createServer(app);
@@ -50,7 +51,8 @@ app.use('/api/donations', donationRoutes);
 app.use('/api/stripe', stripeRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/upload', uploadRoutes);
-app.use('/api/kiosks', kioskRoutes);
+app.use('/api/kiosks',   kioskRoutes);
+app.use('/api/stripe/terminal', terminalRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 

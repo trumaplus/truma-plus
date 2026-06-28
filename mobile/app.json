@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "Truma Plus Kiosk",
+    "slug": "truma-plus-kiosk",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#07131a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.trumaplus.kiosk",
+      "infoPlist": {
+        "NFCReaderUsageDescription": "This app uses NFC to accept contactless payments.",
+        "NSCameraUsageDescription": "Used for QR code scanning.",
+        "UIRequiredDeviceCapabilities": []
+      }
+    },
+    "android": {
+      "package": "com.trumaplus.kiosk",
+      "adaptiveIcon": {
+        "backgroundColor": "#07131a"
+      },
+      "permissions": [
+        "android.permission.NFC",
+        "android.permission.VIBRATE"
+      ]
+    },
+    "plugins": [
+      [
+        "@stripe/stripe-terminal-react-native",
+        {
+          "enableLocationWhenInUse": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.0"
+          },
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_EAS_PROJECT_ID"
+      }
+    }
+  }
+}
