@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { io } from 'socket.io-client';
-import { Settings } from 'lucide-react';
+import { Settings, CheckCircle2, Heart } from 'lucide-react';
 import api from '../api/client';
 import AnnouncementBoard from '../components/AnnouncementBoard';
 import MediaSlideshow from '../components/MediaSlideshow';
@@ -41,8 +41,9 @@ export default function Kiosk() {
   const socketRef = useRef(null);
 
   // ── Auto-reset state ───────────────────────────────────────────────────────
-  const [resetKey,  setResetKey]  = useState(0);
-  const [countdown, setCountdown] = useState(null); // null = idle, 1–10 = counting
+  const [resetKey,       setResetKey]       = useState(0);
+  const [countdown,      setCountdown]      = useState(null); // null = idle, 1–10 = counting
+  const [donationSuccess, setDonationSuccess] = useState(null); // { amount }
   const idleTimerRef  = useRef(null);
   const countTimerRef = useRef(null);
   const isShabbatRef  = useRef(false);
@@ -138,6 +139,16 @@ export default function Kiosk() {
         synagogueName: synagogue?.synagogueName || null,
         deviceInfo: { userAgent: navigator.userAgent, platform: navigator.platform },
       });
+    });
+
+    // Real-time payment completion (from Stripe webhook → socket)
+    socket.on('donation:completed', ({ amount }) => {
+      setDonationSuccess({ amount });
+      // Show success for 5 s, then auto-reset the donation panel
+      setTimeout(() => {
+        setDonationSuccess(null);
+        setResetKey((k) => k + 1);
+      }, 5000);
     });
 
     socket.on('admin:command', ({ type, payload }) => {
@@ -248,6 +259,27 @@ export default function Kiosk() {
             <button onClick={resetIdleTimer} className="btn-gold px-8">
               {idleBtn}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Payment success overlay ────────────────────────────────────────── */}
+      {donationSuccess && (
+        <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/80 backdrop-blur-md fade-in">
+          <div className="flex flex-col items-center gap-5 p-12 card-glass text-center max-w-sm mx-4">
+            <CheckCircle2 className="w-20 h-20 text-emerald-400" strokeWidth={1.5} />
+            <div>
+              <p className="font-display text-5xl text-gold-400 font-bold mb-2">
+                ${donationSuccess.amount}
+              </p>
+              <p className="font-display text-3xl text-white mb-1">
+                {lang === 'he' ? 'תודה על תרומתך!' : lang === 'fr' ? 'Merci pour votre don!' : 'Thank you!'}
+              </p>
+              <p className="text-white/40 text-sm">
+                {lang === 'he' ? 'התשלום התקבל בהצלחה' : lang === 'fr' ? 'Paiement reçu avec succès' : 'Payment received successfully'}
+              </p>
+            </div>
+            <Heart className="w-6 h-6 text-gold-400/40" />
           </div>
         </div>
       )}

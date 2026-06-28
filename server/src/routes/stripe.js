@@ -9,6 +9,7 @@ const {
   isConfigured,
 } = require('../services/stripe.service');
 const { requireAdminOrSynagogue } = require('../middleware/auth');
+const { getIO } = require('../socket');
 
 const prisma = new PrismaClient();
 
@@ -33,7 +34,7 @@ router.post('/checkout', async (req, res) => {
 // POST /api/stripe/webhook
 router.post('/webhook', async (req, res) => {
   try {
-    await handleWebhookEvent(req.body, req.headers['stripe-signature']);
+    await handleWebhookEvent(req.body, req.headers['stripe-signature'], getIO());
     res.json({ received: true });
   } catch (err) {
     console.error('Webhook error:', err.message);

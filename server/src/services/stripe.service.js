@@ -132,7 +132,7 @@ async function createCheckoutSession({ amount, donationType, donorInfo, synagogu
 
 // ── Webhook ───────────────────────────────────────────────────────────────────
 
-async function handleWebhookEvent(rawBody, signature) {
+async function handleWebhookEvent(rawBody, signature, io = null) {
   const stripe        = getStripe();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -179,6 +179,14 @@ async function handleWebhookEvent(rawBody, signature) {
     if (donation.donorPhone) {
       await sendThankYouSMS(donation, donation.synagogue).catch(console.error);
       await prisma.donation.update({ where: { id: donationId }, data: { smsSent: true } });
+    }
+
+    // Notify the kiosk in real-time so it can dismiss the QR modal and show success
+    if (io && donation.synagogueId) {
+      io.to(donation.synagogueId).emit('donation:completed', {
+        donationId: donation.id,
+        amount:     donation.amount,
+      });
     }
   }
 
