@@ -319,7 +319,26 @@ export default function SynagogueSettingsForm({ synagogue }) {
 
           <ChangePasswordSection synagogueId={synagogue.id} />
 
+          {/* Kiosk ID — for the mobile Tap to Pay app */}
           <div className="mt-10 pt-8 border-t border-white/10">
+            <h3 className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-4">
+              מזהה קיוסק (Tap to Pay App)
+            </h3>
+            <div className="flex items-center gap-3 bg-white/4 border border-white/10 rounded-xl px-4 py-3">
+              <code className="text-gold-400 text-sm font-mono flex-1 select-all">{synagogue.id}</code>
+              <button
+                onClick={() => { navigator.clipboard.writeText(synagogue.id); }}
+                className="text-white/30 hover:text-gold-400 transition-colors text-xs"
+              >
+                העתק
+              </button>
+            </div>
+            <p className="text-white/25 text-xs mt-2">
+              הכנס מזהה זה במסך ההגדרה של אפליקציית Truma Plus Kiosk בטאבלט.
+            </p>
+          </div>
+
+          <div className="mt-8 pt-8 border-t border-white/10">
             <h3 className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-4">Payment Account</h3>
             <StripeConnectCard synagogueId={synagogue.id} synagogueName={synagogue.synagogueName} />
           </div>

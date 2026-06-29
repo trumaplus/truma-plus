@@ -190,6 +190,27 @@ async function handleWebhookEvent(rawBody, signature, io = null) {
     }
   }
 
+  // ── Terminal payment succeeded (card_present) ─────────────────────────────
+  if (event.type === 'payment_intent.succeeded') {
+    const pi         = event.data.object;
+    const donationId = pi.metadata?.donationId;
+    // Only handle Terminal payments (source: 'terminal'); Checkout Session
+    // payments are handled via checkout.session.completed above.
+    if (donationId && pi.metadata?.source === 'terminal') {
+      const donation = await prisma.donation.update({
+        where: { id: donationId },
+        data:  { paymentStatus: 'completed', transactionId: pi.id },
+      }).catch(() => null);
+
+      if (donation && io && donation.synagogueId) {
+        io.to(donation.synagogueId).emit('donation:completed', {
+          donationId: donation.id,
+          amount:     donation.amount,
+        });
+      }
+    }
+  }
+
   // ── Payment failed or expired ──────────────────────────────────────────────
   if (
     event.type === 'checkout.session.expired' ||

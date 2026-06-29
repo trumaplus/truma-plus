@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -10,22 +11,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {
-  Reader,
-  useStripeTerminal,
-} from '@stripe/stripe-terminal-react-native';
+import { Reader, useStripeTerminal } from '@stripe/stripe-terminal-react-native';
 import { api } from '../api/client';
 
-// ── Synagogue ID — change this to your synagogue's ID from the DB ─────────────
-const SYNAGOGUE_ID = 'REPLACE_WITH_YOUR_SYNAGOGUE_ID';
-
-const GOLD   = '#ffd166';
-const DARK   = '#07131a';
-const DARK2  = '#0d2030';
-const DARK3  = '#1a3040';
-const RED    = '#ef4444';
-const GREEN  = '#4ade80';
-const WHITE  = '#ffffff';
+const GOLD  = '#ffd166';
+const DARK  = '#07131a';
+const DARK2 = '#0d2030';
+const DARK3 = '#1a3040';
+const RED   = '#ef4444';
+const GREEN = '#4ade80';
+const WHITE = '#ffffff';
 
 const QUICK_AMOUNTS = [18, 36, 54, 72, 100, 180];
 
@@ -41,67 +36,85 @@ const DONATION_TYPES = [
 
 type Step = 'select' | 'tap' | 'processing' | 'success' | 'error';
 
-// ── Pulsing NFC ring animation ────────────────────────────────────────────────
+interface Synagogue {
+  id: string;
+  synagogueName: string;
+  city?: string;
+  logoUrl?: string;
+}
+
+// ── Pulsing NFC rings ─────────────────────────────────────────────────────────
 function NfcRings() {
-  const ring1 = useRef(new Animated.Value(0)).current;
-  const ring2 = useRef(new Animated.Value(0)).current;
-  const ring3 = useRef(new Animated.Value(0)).current;
+  const anims = [
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+  ];
 
   useEffect(() => {
-    const pulse = (anim: Animated.Value, delay: number) =>
+    anims.forEach((anim, i) => {
       Animated.loop(
         Animated.sequence([
-          Animated.delay(delay),
+          Animated.delay(i * 380),
           Animated.timing(anim, {
-            toValue: 1,
-            duration: 1600,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
+            toValue: 1, duration: 1500,
+            easing: Easing.out(Easing.ease), useNativeDriver: true,
           }),
-          Animated.timing(anim, {
-            toValue: 0,
-            duration: 0,
-            useNativeDriver: true,
-          }),
+          Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: true }),
         ])
       ).start();
-
-    pulse(ring1, 0);
-    pulse(ring2, 400);
-    pulse(ring3, 800);
+    });
   }, []);
 
-  const ringStyle = (anim: Animated.Value, size: number) => ({
-    position: 'absolute' as const,
-    width: size,
-    height: size,
-    borderRadius: size / 2,
-    borderWidth: 2,
-    borderColor: GOLD,
-    opacity: anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.8, 0.4, 0] }),
-    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.5] }) }],
-  });
-
+  const sizes = [140, 190, 240];
   return (
-    <View style={styles.nfcRingsContainer}>
-      <Animated.View style={ringStyle(ring1, 160)} />
-      <Animated.View style={ringStyle(ring2, 200)} />
-      <Animated.View style={ringStyle(ring3, 240)} />
-      <Text style={styles.nfcIcon}>📱</Text>
+    <View style={styles.nfcContainer}>
+      {anims.map((anim, i) => (
+        <Animated.View
+          key={i}
+          style={[
+            styles.nfcRing,
+            {
+              width: sizes[i], height: sizes[i], borderRadius: sizes[i] / 2,
+              opacity: anim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0.9, 0.4, 0] }),
+              transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.4] }) }],
+            },
+          ]}
+        />
+      ))}
+      <Text style={styles.nfcEmoji}>📱</Text>
     </View>
   );
 }
 
 // ── Main screen ───────────────────────────────────────────────────────────────
-export default function KioskScreen() {
-  const [step,          setStep]         = useState<Step>('select');
-  const [readerStatus,  setReaderStatus] = useState<'connecting' | 'ready' | 'error'>('connecting');
-  const [donationType,  setDonationType] = useState('general');
-  const [amount,        setAmount]       = useState(18);
-  const [customAmount,  setCustomAmount] = useState('');
-  const [errorMsg,      setErrorMsg]     = useState('');
+interface Props {
+  synagogueId: string;
+  onReset: () => void;
+}
+
+export default function KioskScreen({ synagogueId, onReset }: Props) {
+  const [synagogue,    setSynagogue]   = useState<Synagogue | null>(null);
+  const [step,         setStep]        = useState<Step>('select');
+  const [readerReady,  setReaderReady] = useState(false);
+  const [donationType, setDonationType] = useState('general');
+  const [amount,       setAmount]      = useState(18);
+  const [customAmount, setCustomAmount] = useState('');
+  const [errorMsg,     setErrorMsg]    = useState('');
+
+  // Long-press header (5 s) to reset synagogue setup
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function startHold() { holdTimer.current = setTimeout(onReset, 5000); }
+  function endHold()   { if (holdTimer.current) clearTimeout(holdTimer.current); }
 
   const finalAmount = customAmount ? parseFloat(customAmount) : amount;
+
+  // Fetch synagogue branding
+  useEffect(() => {
+    api.get(`/synagogues/public/${synagogueId}`)
+      .then(({ data }) => setSynagogue(data))
+      .catch(() => {});
+  }, [synagogueId]);
 
   const {
     discoverReaders,
@@ -114,87 +127,57 @@ export default function KioskScreen() {
     onUpdateDiscoveredReaders: useCallback(async (readers: Reader.Type[]) => {
       if (readers.length > 0 && !connectedReader) {
         const { error } = await connectLocalMobileReader(readers[0]);
-        if (error) {
-          setReaderStatus('error');
-        } else {
-          setReaderStatus('ready');
-        }
+        if (!error) setReaderReady(true);
       }
     }, [connectedReader, connectLocalMobileReader]),
   });
 
-  // Auto-discover local mobile reader (the device itself) on mount
   useEffect(() => {
-    discoverReaders({
-      discoveryMethod: 'localMobile',
-      simulated: false, // set to true for testing without real NFC
-    });
+    discoverReaders({ discoveryMethod: 'localMobile', simulated: false });
   }, [discoverReaders]);
 
-  // Keep reader status in sync with connectedReader
   useEffect(() => {
-    if (connectedReader) setReaderStatus('ready');
+    if (connectedReader) setReaderReady(true);
   }, [connectedReader]);
 
-  // ── Donate flow ──────────────────────────────────────────────────────────────
+  // ── Donate ──────────────────────────────────────────────────────────────────
   async function handleDonate() {
-    if (!finalAmount || finalAmount < 1) return;
-    if (!connectedReader) {
-      setErrorMsg('מכשיר התשלום לא מחובר. נסה שוב.');
-      setStep('error');
-      return;
-    }
-
+    if (!finalAmount || finalAmount < 1 || !readerReady) return;
     setStep('tap');
-
     try {
-      // 1. Create PaymentIntent on server
       const { data } = await api.post('/stripe/terminal/payment-intent', {
-        amount:       finalAmount,
-        synagogueId:  SYNAGOGUE_ID,
-        donationType,
+        amount: finalAmount, synagogueId, donationType,
       });
 
-      // 2. Collect payment method — shows iOS/Android "Tap card here" UI
-      const { paymentIntent, error: collectError } = await collectPaymentMethod({
+      const { paymentIntent, error: collectErr } = await collectPaymentMethod({
         paymentIntentClientSecret: data.clientSecret,
         skipTipping: true,
       });
 
-      if (collectError) {
-        setErrorMsg(collectError.message || 'שגיאה באיסוף אמצעי תשלום');
+      if (collectErr) {
+        setErrorMsg(collectErr.message || 'שגיאה באיסוף תשלום');
         setStep('error');
         return;
       }
 
       setStep('processing');
 
-      // 3. Process the payment (charge the card)
-      const { paymentIntent: captured, error: processError } = await processPayment(paymentIntent!);
-
-      if (processError) {
-        setErrorMsg(processError.message || 'שגיאה בעיבוד התשלום');
+      const { paymentIntent: captured, error: processErr } = await processPayment(paymentIntent!);
+      if (processErr) {
+        setErrorMsg(processErr.message || 'שגיאה בעיבוד התשלום');
         setStep('error');
         return;
       }
 
-      // 4. Notify server so donation DB record is updated immediately
-      try {
-        await api.post(`/stripe/terminal/payment-intent/${captured!.id}/complete`);
-      } catch { /* webhook will handle it as backup */ }
+      // Notify server (fire-and-forget — webhook is the reliable backup)
+      api.post(`/stripe/terminal/payment-intent/${captured!.id}/complete`).catch(() => {});
 
       setStep('success');
       setTimeout(() => resetFlow(), 6000);
-
     } catch (err: any) {
-      setErrorMsg(err?.response?.data?.error || 'שגיאה בלתי צפויה. נסה שוב.');
+      setErrorMsg(err?.response?.data?.error || 'שגיאה בלתי צפויה');
       setStep('error');
     }
-  }
-
-  function cancelTap() {
-    cancelCollectPaymentMethod();
-    setStep('select');
   }
 
   function resetFlow() {
@@ -204,58 +187,47 @@ export default function KioskScreen() {
     setErrorMsg('');
   }
 
-  // ── Tap screen ───────────────────────────────────────────────────────────────
+  // ── Tap screen ──────────────────────────────────────────────────────────────
   if (step === 'tap') {
     return (
-      <View style={[styles.full, styles.center, { backgroundColor: DARK }]}>
+      <View style={[styles.full, styles.center]}>
         <NfcRings />
-        <Text style={styles.tapTitle}>הצמד כרטיס או טלפון</Text>
-        <Text style={styles.tapAmount}>${finalAmount} CAD</Text>
-        <Text style={styles.tapSub}>
-          Apple Pay · Google Pay · כרטיס בנקאי
-        </Text>
-        <TouchableOpacity style={styles.cancelBtn} onPress={cancelTap}>
+        <Text style={styles.h1}>הצמד כרטיס או טלפון</Text>
+        <Text style={styles.bigAmount}>${finalAmount} CAD</Text>
+        <Text style={styles.muted}>Apple Pay · Google Pay · כרטיס בנקאי</Text>
+        <TouchableOpacity style={styles.cancelBtn} onPress={() => { cancelCollectPaymentMethod(); setStep('select'); }}>
           <Text style={styles.cancelText}>ביטול</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  // ── Processing screen ────────────────────────────────────────────────────────
   if (step === 'processing') {
     return (
-      <View style={[styles.full, styles.center, { backgroundColor: DARK }]}>
+      <View style={[styles.full, styles.center]}>
         <ActivityIndicator size="large" color={GOLD} />
-        <Text style={[styles.tapTitle, { marginTop: 24 }]}>מעבד תשלום…</Text>
+        <Text style={[styles.h1, { marginTop: 24 }]}>מעבד תשלום…</Text>
       </View>
     );
   }
 
-  // ── Success screen ───────────────────────────────────────────────────────────
   if (step === 'success') {
     return (
-      <View style={[styles.full, styles.center, { backgroundColor: DARK }]}>
+      <View style={[styles.full, styles.center]}>
         <Text style={{ fontSize: 80 }}>✅</Text>
-        <Text style={[styles.tapAmount, { color: GREEN, marginTop: 16 }]}>
-          ${finalAmount} CAD
-        </Text>
-        <Text style={styles.tapTitle}>תודה על תרומתך!</Text>
-        <Text style={styles.tapSub}>התשלום התקבל בהצלחה</Text>
+        <Text style={[styles.bigAmount, { color: GREEN, marginTop: 16 }]}>${finalAmount} CAD</Text>
+        <Text style={styles.h1}>תודה על תרומתך!</Text>
+        <Text style={styles.muted}>התשלום התקבל בהצלחה</Text>
       </View>
     );
   }
 
-  // ── Error screen ─────────────────────────────────────────────────────────────
   if (step === 'error') {
     return (
-      <View style={[styles.full, styles.center, { backgroundColor: DARK }]}>
+      <View style={[styles.full, styles.center]}>
         <Text style={{ fontSize: 64 }}>❌</Text>
-        <Text style={[styles.tapTitle, { color: RED, marginTop: 16 }]}>
-          התשלום נכשל
-        </Text>
-        <Text style={[styles.tapSub, { color: 'rgba(255,255,255,0.5)', marginBottom: 32 }]}>
-          {errorMsg}
-        </Text>
+        <Text style={[styles.h1, { color: RED, marginTop: 16 }]}>התשלום נכשל</Text>
+        <Text style={[styles.muted, { marginBottom: 32, paddingHorizontal: 40, textAlign: 'center' }]}>{errorMsg}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={resetFlow}>
           <Text style={styles.retryText}>נסה שנית</Text>
         </TouchableOpacity>
@@ -263,98 +235,93 @@ export default function KioskScreen() {
     );
   }
 
-  // ── Selection screen ─────────────────────────────────────────────────────────
+  // ── Selection screen ────────────────────────────────────────────────────────
   return (
-    <View style={[styles.full, { backgroundColor: DARK, flexDirection: 'row' }]}>
+    <View style={[styles.full, { flexDirection: 'column' }]}>
 
-      {/* ── Left: donation type ── */}
-      <View style={styles.leftCol}>
-        <Text style={styles.sectionLabel}>סוג תרומה</Text>
-        {DONATION_TYPES.map((dt) => (
-          <TouchableOpacity
-            key={dt.id}
-            style={[
-              styles.typeBtn,
-              donationType === dt.id && styles.typeBtnActive,
-            ]}
-            onPress={() => setDonationType(dt.id)}
-          >
-            <Text style={[
-              styles.typeBtnText,
-              donationType === dt.id && styles.typeBtnTextActive,
-            ]}>
-              {dt.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* ── Right: amount + pay ── */}
-      <View style={styles.rightCol}>
-
-        {/* Reader status pill */}
-        <View style={styles.statusRow}>
-          <View style={[
-            styles.statusDot,
-            { backgroundColor: readerStatus === 'ready' ? GREEN : readerStatus === 'error' ? RED : GOLD }
-          ]} />
-          <Text style={styles.statusText}>
-            {readerStatus === 'ready'      ? 'מוכן לתשלום' :
-             readerStatus === 'error'      ? 'שגיאת NFC'   :
-                                            'מתחבר…'}
-          </Text>
+      {/* Header — long-press 5 s to reset */}
+      <Pressable
+        style={styles.header}
+        onPressIn={startHold}
+        onPressOut={endHold}
+      >
+        {synagogue?.logoUrl && (
+          <Image source={{ uri: synagogue.logoUrl }} style={styles.logo} />
+        )}
+        <View>
+          <Text style={styles.synagogueName}>{synagogue?.synagogueName ?? '…'}</Text>
+          {synagogue?.city && <Text style={styles.synagogueCity}>{synagogue.city}</Text>}
         </View>
 
-        <Text style={styles.sectionLabel}>בחר סכום</Text>
+        {/* Reader status */}
+        <View style={styles.statusPill}>
+          <View style={[styles.dot, { backgroundColor: readerReady ? GREEN : GOLD }]} />
+          <Text style={styles.statusText}>
+            {readerReady ? 'מוכן לתשלום' : 'מתחבר…'}
+          </Text>
+        </View>
+      </Pressable>
 
-        {/* Quick amounts */}
-        <View style={styles.amountsGrid}>
-          {QUICK_AMOUNTS.map((a) => (
+      {/* Body — two columns */}
+      <View style={{ flex: 1, flexDirection: 'row' }}>
+
+        {/* Left: donation types */}
+        <View style={styles.leftCol}>
+          <Text style={styles.label}>סוג תרומה</Text>
+          {DONATION_TYPES.map((dt) => (
             <TouchableOpacity
-              key={a}
-              style={[
-                styles.amountBtn,
-                amount === a && !customAmount && styles.amountBtnActive,
-              ]}
-              onPress={() => { setAmount(a); setCustomAmount(''); }}
+              key={dt.id}
+              style={[styles.typeBtn, donationType === dt.id && styles.typeBtnOn]}
+              onPress={() => setDonationType(dt.id)}
             >
-              <Text style={[
-                styles.amountBtnText,
-                amount === a && !customAmount && styles.amountBtnTextActive,
-              ]}>
-                ${a}
+              <Text style={[styles.typeTxt, donationType === dt.id && styles.typeTxtOn]}>
+                {dt.label}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Custom amount */}
-        <TextInput
-          style={styles.customInput}
-          keyboardType="numeric"
-          placeholder="סכום אחר $"
-          placeholderTextColor="rgba(255,255,255,0.25)"
-          value={customAmount}
-          onChangeText={setCustomAmount}
-        />
+        {/* Right: amounts + pay */}
+        <View style={styles.rightCol}>
+          <Text style={styles.label}>בחר סכום</Text>
 
-        {/* Total + Pay button */}
-        <View style={styles.footer}>
-          <View>
-            <Text style={styles.totalLabel}>סה״כ</Text>
-            <Text style={styles.totalAmount}>${finalAmount || 0} CAD</Text>
+          <View style={styles.grid}>
+            {QUICK_AMOUNTS.map((a) => (
+              <TouchableOpacity
+                key={a}
+                style={[styles.amtBtn, amount === a && !customAmount && styles.amtBtnOn]}
+                onPress={() => { setAmount(a); setCustomAmount(''); }}
+              >
+                <Text style={[styles.amtTxt, amount === a && !customAmount && styles.amtTxtOn]}>
+                  ${a}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
-          <TouchableOpacity
-            style={[
-              styles.payBtn,
-              (readerStatus !== 'ready' || !finalAmount || finalAmount < 1) && styles.payBtnDisabled,
-            ]}
-            onPress={handleDonate}
-            disabled={readerStatus !== 'ready' || !finalAmount || finalAmount < 1}
-          >
-            <Text style={styles.payBtnText}>📲  הצמד לתשלום</Text>
-          </TouchableOpacity>
+          <TextInput
+            style={styles.customInput}
+            keyboardType="numeric"
+            placeholder="סכום אחר $"
+            placeholderTextColor="rgba(255,255,255,0.22)"
+            value={customAmount}
+            onChangeText={setCustomAmount}
+          />
+
+          <View style={styles.footer}>
+            <View>
+              <Text style={styles.totalLbl}>סה״כ לתרומה</Text>
+              <Text style={styles.totalAmt}>${finalAmount || 0} CAD</Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.payBtn, (!readerReady || !finalAmount || finalAmount < 1) && styles.payBtnOff]}
+              onPress={handleDonate}
+              disabled={!readerReady || !finalAmount || finalAmount < 1}
+            >
+              <Text style={styles.payTxt}>📲  הצמד לתשלום</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
       </View>
@@ -364,81 +331,69 @@ export default function KioskScreen() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  full:   { flex: 1 },
-  center: { alignItems: 'center', justifyContent: 'center' },
+  full:   { flex: 1, backgroundColor: DARK },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: DARK },
 
-  // Tap / processing / success / error screens
-  nfcRingsContainer: {
-    width: 240, height: 240,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 32,
+  // Header
+  header: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: DARK2, borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 20, paddingVertical: 10,
   },
-  nfcIcon:    { fontSize: 72 },
-  tapTitle:   { fontSize: 28, fontWeight: '700', color: WHITE,  marginBottom: 8 },
-  tapAmount:  { fontSize: 48, fontWeight: '800', color: GOLD,   marginBottom: 8 },
-  tapSub:     { fontSize: 15, color: 'rgba(255,255,255,0.4)', marginBottom: 40, textAlign: 'center' },
-  cancelBtn:  { paddingHorizontal: 32, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  cancelText: { color: 'rgba(255,255,255,0.5)', fontSize: 15 },
-  retryBtn:   { backgroundColor: GOLD, paddingHorizontal: 40, paddingVertical: 14, borderRadius: 16 },
-  retryText:  { color: DARK, fontWeight: '700', fontSize: 16 },
+  logo:          { width: 40, height: 40, borderRadius: 10 },
+  synagogueName: { color: GOLD, fontWeight: '700', fontSize: 15 },
+  synagogueCity: { color: 'rgba(255,255,255,0.35)', fontSize: 11 },
+  statusPill: {
+    marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 5,
+  },
+  dot:        { width: 7, height: 7, borderRadius: 4 },
+  statusText: { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
 
-  // Selection screen — left column
+  // Left column
   leftCol: {
-    width: 200, borderRightWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
-    paddingVertical: 24, paddingHorizontal: 16,
+    width: 188, borderRightWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    paddingVertical: 18, paddingHorizontal: 14,
   },
-  sectionLabel: {
-    fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.35)',
-    letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12,
-  },
-  typeBtn: {
-    paddingVertical: 12, paddingHorizontal: 14,
-    borderRadius: 12, marginBottom: 6,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  typeBtnActive: { backgroundColor: `${GOLD}22` },
-  typeBtnText:   { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '500', textAlign: 'right' },
-  typeBtnTextActive: { color: GOLD, fontWeight: '700' },
+  label:    { fontSize: 10, fontWeight: '600', color: 'rgba(255,255,255,0.3)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
+  typeBtn:  { paddingVertical: 11, paddingHorizontal: 12, borderRadius: 11, marginBottom: 5, backgroundColor: 'rgba(255,255,255,0.04)' },
+  typeBtnOn: { backgroundColor: `${GOLD}22` },
+  typeTxt:  { color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '500', textAlign: 'right' },
+  typeTxtOn: { color: GOLD, fontWeight: '700' },
 
-  // Selection screen — right column
-  rightCol: {
-    flex: 1, paddingVertical: 24, paddingHorizontal: 24,
-  },
-  statusRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  statusText: { color: 'rgba(255,255,255,0.4)', fontSize: 12 },
-
-  amountsGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12,
-  },
-  amountBtn: {
-    width: '30%', paddingVertical: 16,
-    borderRadius: 14, alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  amountBtnActive: { backgroundColor: GOLD },
-  amountBtnText:   { color: 'rgba(255,255,255,0.7)', fontSize: 18, fontWeight: '600' },
-  amountBtnTextActive: { color: DARK, fontWeight: '700' },
-
+  // Right column
+  rightCol: { flex: 1, paddingVertical: 18, paddingHorizontal: 20 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 12 },
+  amtBtn:  { width: '31%', paddingVertical: 15, borderRadius: 13, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)' },
+  amtBtnOn: { backgroundColor: GOLD },
+  amtTxt:  { color: 'rgba(255,255,255,0.65)', fontSize: 17, fontWeight: '600' },
+  amtTxtOn: { color: DARK, fontWeight: '700' },
   customInput: {
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
-    color: WHITE, fontSize: 18, textAlign: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    marginBottom: 20,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', borderRadius: 13,
+    paddingHorizontal: 14, paddingVertical: 13,
+    color: WHITE, fontSize: 17, textAlign: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)', marginBottom: 16,
   },
 
-  footer: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginTop: 'auto',
-  },
-  totalLabel:  { color: 'rgba(255,255,255,0.35)', fontSize: 12, marginBottom: 4 },
-  totalAmount: { color: GOLD, fontSize: 32, fontWeight: '800' },
+  // Footer
+  footer:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' },
+  totalLbl: { color: 'rgba(255,255,255,0.3)', fontSize: 11, marginBottom: 3 },
+  totalAmt: { color: GOLD, fontSize: 30, fontWeight: '800' },
+  payBtn:   { backgroundColor: GOLD, paddingHorizontal: 32, paddingVertical: 17, borderRadius: 17 },
+  payBtnOff: { opacity: 0.35 },
+  payTxt:   { color: DARK, fontSize: 17, fontWeight: '800' },
 
-  payBtn: {
-    backgroundColor: GOLD, paddingHorizontal: 36, paddingVertical: 18,
-    borderRadius: 18, alignItems: 'center',
-  },
-  payBtnDisabled: { opacity: 0.4 },
-  payBtnText: { color: DARK, fontSize: 18, fontWeight: '800', letterSpacing: 0.3 },
+  // Tap / success / error screens
+  nfcContainer: { width: 240, height: 240, alignItems: 'center', justifyContent: 'center', marginBottom: 28 },
+  nfcRing:      { position: 'absolute', borderWidth: 1.5, borderColor: GOLD },
+  nfcEmoji:     { fontSize: 72 },
+  h1:       { fontSize: 26, fontWeight: '700', color: WHITE, marginBottom: 8 },
+  bigAmount:{ fontSize: 46, fontWeight: '800', color: GOLD, marginBottom: 8 },
+  muted:    { fontSize: 14, color: 'rgba(255,255,255,0.38)', marginBottom: 36 },
+  cancelBtn:{ paddingHorizontal: 28, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  cancelText:{ color: 'rgba(255,255,255,0.45)', fontSize: 14 },
+  retryBtn: { backgroundColor: GOLD, paddingHorizontal: 36, paddingVertical: 14, borderRadius: 15 },
+  retryText:{ color: DARK, fontWeight: '700', fontSize: 15 },
 });
