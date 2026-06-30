@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
 const Stripe = require('stripe');
 const { getIO } = require('../socket');
+const { sendReceiptEmail } = require('../services/email.service');
 
 const prisma = new PrismaClient();
 
@@ -32,7 +33,7 @@ router.post('/connection-token', async (req, res) => {
 // ── POST /api/stripe/terminal/payment-intent ──────────────────────────────────
 // Creates a PaymentIntent for a Terminal (card_present) payment.
 router.post('/payment-intent', async (req, res) => {
-  const { amount, synagogueId, donationType = 'general' } = req.body;
+  const { amount, synagogueId, donationType = 'general', donorEmail } = req.body;
 
   if (!amount || !synagogueId) {
     return res.status(400).json({ error: 'amount and synagogueId required' });
@@ -49,13 +50,19 @@ router.post('/payment-intent', async (req, res) => {
     const amountInCents = Math.round(parseFloat(amount) * 100);
 
     // Create a pending donation record so we can track it
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const validEmail = donorEmail && EMAIL_RE.test(donorEmail.trim())
+      ? donorEmail.trim().toLowerCase() : null;
+
     const donation = await prisma.donation.create({
       data: {
         synagogueId,
-        amount:       parseFloat(amount),
-        currency:     'CAD',
+        amount:           parseFloat(amount),
+        currency:         'CAD',
         donationType,
-        paymentStatus:'pending',
+        paymentStatus:    'pending',
+        donorEmail:       validEmail,
+        receiptRequested: !!validEmail,
       },
     });
 
@@ -107,17 +114,24 @@ router.post('/payment-intent/:piId/complete', async (req, res) => {
     });
     if (!donation) return res.status(404).json({ error: 'Donation not found' });
 
-    await prisma.donation.update({
+    const completed = await prisma.donation.update({
       where: { id: donation.id },
       data:  { paymentStatus: 'completed', transactionId: piId },
+      include: { synagogue: true },
     });
+
+    // Send receipt email if donor provided one
+    if (completed.donorEmail) {
+      sendReceiptEmail(completed, completed.synagogue, 'he').catch(console.error);
+      await prisma.donation.update({ where: { id: donation.id }, data: { receiptSent: true } });
+    }
 
     // Notify kiosk / dashboard via socket
     const io = getIO();
-    if (io && donation.synagogueId) {
-      io.to(donation.synagogueId).emit('donation:completed', {
-        donationId: donation.id,
-        amount:     donation.amount,
+    if (io && completed.synagogueId) {
+      io.to(completed.synagogueId).emit('donation:completed', {
+        donationId: completed.id,
+        amount:     completed.amount,
       });
     }
 
