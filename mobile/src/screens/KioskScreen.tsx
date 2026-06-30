@@ -109,17 +109,25 @@ export default function KioskScreen({ synagogueId, onReset }: Props) {
   const socketRef  = useRef<Socket | null>(null);
   const idleRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks the latest `step` for use inside the long-lived socket effect closure
+  // (the effect only runs once on mount, so it would otherwise always see step==='select')
+  const stepRef    = useRef<Step>('select');
+  useEffect(() => { stepRef.current = step; }, [step]);
+  const shabbatRef = useRef(false);
+  useEffect(() => { shabbatRef.current = shabbatMode; }, [shabbatMode]);
 
   const finalAmount = customAmount ? parseFloat(customAmount) : amount;
 
   // ── Idle timer — resets form after 30 s of no interaction ─────────────────
+  // Uses shabbatRef (not the shabbatMode state) so this stays stable and safe
+  // to call from the long-lived socket effect's closures without going stale.
   const resetIdle = useCallback(() => {
     if (idleRef.current) clearTimeout(idleRef.current);
-    if (shabbatMode) return;
+    if (shabbatRef.current) return;
     idleRef.current = setTimeout(() => {
       resetFlow();
     }, IDLE_MS);
-  }, [shabbatMode]);
+  }, []);
 
   useEffect(() => {
     resetIdle();
@@ -170,16 +178,17 @@ export default function KioskScreen({ synagogueId, onReset }: Props) {
       }
     });
 
-    // Also receive real-time payment completion from webhook
+    // Also receive real-time payment completion from webhook (recovery path —
+    // the primary success path is the synchronous processPayment() call below).
     socket.on('donation:completed', () => {
-      if (step === 'tap') {
+      if (stepRef.current === 'tap' || stepRef.current === 'processing') {
         setStep('success');
         setTimeout(() => resetFlow(), 6000);
       }
     });
 
     const statusInterval = setInterval(() => {
-      socket.emit('kiosk:status', { synagogueId, shabbatMode, timestamp: new Date().toISOString() });
+      socket.emit('kiosk:status', { synagogueId, shabbatMode: shabbatRef.current, timestamp: new Date().toISOString() });
     }, 30_000);
 
     return () => {
